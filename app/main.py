@@ -266,25 +266,28 @@ def guardar_voto():
     
 @app.route('/resultados')
 def resultados():
-    # Ahora permitimos que entre cualquier juez logueado
     if 'juez_id' not in session:
         return redirect(url_for('login'))
     
     conn = None
     cursor = None
     
-    try: # <--- FALTABA ESTE TRY
+    try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True) 
+        # Mantenemos el buffered=True por seguridad de hilos
+        cursor = conn.cursor(dictionary=True, buffered=True)
+        
+        # Guardamos las variables de control al principio
         genero_actual = obtener_tipo_evento()
+        es_administrador = session.get('es_admin')
 
         # 1. Ranking con detección de empates
         sql_ranking = """
             SELECT c.nombre, 
-                    IFNULL(SUM(v.cat_belleza), 0) as belleza, 
-                    IFNULL(SUM(v.cat_simpatia), 0) as simpatia, 
-                    IFNULL(SUM(v.cat_elegancia), 0) as elegancia,
-                    (IFNULL(SUM(v.cat_belleza), 0) + 
+                   IFNULL(SUM(v.cat_belleza), 0) as belleza, 
+                   IFNULL(SUM(v.cat_simpatia), 0) as simpatia, 
+                   IFNULL(SUM(v.cat_elegancia), 0) as elegancia,
+                   (IFNULL(SUM(v.cat_belleza), 0) + 
                     IFNULL(SUM(v.cat_simpatia), 0) + 
                     IFNULL(SUM(v.cat_elegancia), 0)) as total 
             FROM candidatas c 
@@ -325,7 +328,11 @@ def resultados():
 
         # Solo el admin ve la participación detallada
         participacion = []
-        if session.get('es_admin'):
+        if es_administrador:
+            # 💡 TRUCO DE SEGURIDAD: Vaciamos cualquier basura del cursor antes de otra consulta larga
+            try: cursor.fetchall() 
+            except: pass
+            
             cursor.execute("""
                 SELECT j.nombre as juez, c.nombre as candidata 
                 FROM votos v 
@@ -334,22 +341,85 @@ def resultados():
                 ORDER BY v.id DESC
             """)
             participacion = cursor.fetchall()
+        
+        # 💡 TRUCO DE SEGURIDAD: Vaciamos nuevamente antes del monitor
+        try: cursor.fetchall() 
+        except: pass
+
+        # --- MONITOR DE ACTIVIDAD DE JUECES EN TIEMPO REAL ---
+        # 1. Averiguamos cuántos candidatos hay del género actual
+        cursor.execute("SELECT COUNT(1) as total FROM candidatas WHERE genero = %s", (genero_actual,))
+        total_candidatas_genero = cursor.fetchone()['total']
+        
+        # 💡 Limpieza rápida para el siguiente SELECT
+        try: cursor.fetchall() 
+        except: pass
+
+        # 2. Consultamos cuántos votos reales lleva cada juez (EXCLUYENDO AL ADMIN)
+        query_monitoreo = """
+            SELECT 
+                j.id as juez_id,
+                j.nombre as juez_nombre,
+                COUNT(v.id) as votos_emitidos
+            FROM jueces j
+            LEFT JOIN votos v ON j.id = v.juez_id 
+            LEFT JOIN candidatas c ON v.candidata_id = c.id AND c.genero = %s
+            WHERE j.nombre != 'Admin'
+            GROUP BY j.id, j.nombre
+            ORDER BY votos_emitidos ASC, j.nombre ASC;
+        """
+        cursor.execute(query_monitoreo, (genero_actual,))
+        jueces_raw = cursor.fetchall()
+        
+        # 3. Procesamos los datos y calculamos porcentajes en memoria
+        estado_jueces = []
+        todos_terminaron = True
+        
+        for j in jueces_raw:
+            juez_limpio = {
+                'nombre': j['juez_nombre'],
+                'votos_emitidos': j['votos_emitidos'],
+                'total_esperado': total_candidatas_genero,
+                'porcentaje': 0
+            }
+            
+            try:
+                juez_limpio['nombre'] = j['juez_nombre'].encode('latin1').decode('utf-8')
+            except:
+                pass
+                
+            if total_candidatas_genero > 0:
+                juez_limpio['porcentaje'] = int((j['votos_emitidos'] / total_candidatas_genero) * 100)
+                
+            if juez_limpio['porcentaje'] < 100:
+                todos_terminaron = False
+                
+            estado_jueces.append(juez_limpio)
+
+        # 💡 Limpieza final antes del último select de config
+        try: cursor.fetchall() 
+        except: pass
 
         # LEER EL ESTADO ACTUAL DE LA CONFIGURACIÓN
         cursor.execute("SELECT valor FROM configuracion WHERE nombre_config = 'resultados_visibles'")
         config = cursor.fetchone()
         habilitado = (config['valor'] == '1') if config else False
 
-        return render_template('resultados.html', 
-                               ranking=ranking, 
-                               participacion=participacion, 
-                               hay_empate=hay_empate,
-                               categorias_empatadas=categorias_empatadas,
-                               resultados_habilitados=habilitado, 
-                               es_admin=session.get('es_admin'),
-                               juez=session.get('juez_nombre'))
+        # Almacenamos el estado de resultados antes de renderizar
+        resultados_hab = obtener_estado_resultados()
 
-    except mysql.connector.Error as err: # <--- AHORA SÍ TIENE SU TRY
+        return render_template('resultados.html', 
+                               ranking=ranking,
+                               participacion=participacion,
+                               genero_evento=genero_actual,
+                               resultados_habilitados=resultados_hab,
+                               es_admin=es_administrador,
+                               juez=session['juez_nombre'],
+                               hay_empate=hay_empate,
+                               estado_jueces=estado_jueces,
+                               todos_terminaron=todos_terminaron)
+
+    except mysql.connector.Error as err:
         print(f"Error en la base de datos: {err}")
         return f"Error técnico: {err}", 500
         

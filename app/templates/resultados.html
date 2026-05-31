@@ -190,6 +190,11 @@
         </div>
 
         <div class="tabla-responsiva">
+            <!-- Botones de Paginación Interna -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button onclick="cambiarPagina('top5')" id="btn-top5" style="padding: 8px 16px; border-radius: 20px; border: 1px solid #764ba2; cursor: pointer; font-weight: bold; background: #764ba2; color: white;">⭐ Top 5 Puestos</button>
+                <button onclick="cambiarPagina('todos')" id="btn-todos" style="padding: 8px 16px; border-radius: 20px; border: 1px solid #764ba2; cursor: pointer; font-weight: bold; background: white; color: #764ba2;">📋 Ver Lista Completa</button>
+            </div>
             <table>
                 <thead>
                     <tr>
@@ -202,7 +207,8 @@
                 </thead>
                 <tbody>
                     {% for fila in ranking %}
-                    <tr>
+                    <!-- Guardamos el índice del loop nativo de Jinja -->
+                    <tr class="fila-ranking" data-index="{{ loop.index }}">
                         <td style="font-weight: bold; text-align: left;">{{ fila.nombre }}</td>
                         <td>{{ fila.belleza or 0 }}</td> 
                         <td>{{ fila.simpatia or 0 }}</td>
@@ -215,6 +221,41 @@
         </div>
 
         {% if es_admin %}
+            
+            <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #e0e0e0; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                <h3 style="margin: 0 0 15px 0; color: #764ba2; font-size: 1.1em; display: flex; align-items: center; justify-content: space-between;">
+                    <span>🖥️ Monitor de Jueces en Tiempo Real</span>
+                    {% if todos_terminaron %}
+                        <span style="background: #28a745; color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.75em;">✓ Escrutinio Cerrado</span>
+                    {% else %}
+                        <span style="background: #ffc107; color: #333; padding: 3px 10px; border-radius: 20px; font-size: 0.75em;">⏳ En Proceso</span>
+                    {% endif %}
+                </h3>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                    {% for j in estado_jueces %}
+                    <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #eee;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 5px; font-weight: bold;">
+                            <span style="color: #333;">👤 {{ j.nombre }}</span>
+                            <span style="color: #666;">{{ j.votos_emitidos }} / {{ j.total_esperado }}</span>
+                        </div>
+                        
+                        <div style="width: 100%; background: #e9ecef; height: 10px; border-radius: 5px; overflow: hidden;">
+                            <div style="height: 100%; width: {{ j.porcentaje }}%; transition: width 0.5s ease;
+                                background: {% if j.porcentaje == 100 %} #28a745 {% elif j.porcentaje > 40 %} #ffc107 {% else %} #dc3545 {% endif %};">
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: right; font-size: 0.75em; margin-top: 3px; font-weight: bold;
+                            color: {% if j.porcentaje == 100 %} #28a745 {% elif j.porcentaje > 40 %} #b58900 {% else %} #dc3545 {% endif %};">
+                            {{ j.porcentaje }}% completado
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+
             <button onclick="window.print()" class="btn-print">
                 🖨️ Imprimir Acta de Resultados
             </button>
@@ -240,6 +281,34 @@
         function toggleDetalle() {
             let x = document.getElementById("detalle-jueces");
             x.style.display = (x.style.display === "none") ? "block" : "none";
+        }
+
+        // Al cargar la página, mostramos por defecto solo el Top 5
+        document.addEventListener("DOMContentLoaded", function() {
+            cambiarPagina('top5');
+        });
+
+        function cambiarPagina(modo) {
+            let filas = document.querySelectorAll('.fila-ranking');
+            let btnTop5 = document.getElementById('btn-top5');
+            let btnTodos = document.getElementById('btn-todos');
+
+            if (modo === 'top5') {
+                filas.forEach(f => {
+                    // El data-index arranca en 1, ocultamos los mayores a 5
+                    if (parseInt(f.getAttribute('data-index')) > 5) {
+                        f.style.display = 'none';
+                    } else {
+                        f.style.display = '';
+                    }
+                });
+                btnTop5.style.background = '#764ba2'; btnTop5.style.color = 'white';
+                btnTodos.style.background = 'white'; btnTodos.style.color = '#764ba2';
+            } else {
+                filas.forEach(f => f.style.display = ''); // Muestra todos sin restricciones
+                btnTodos.style.background = '#764ba2'; btnTodos.style.color = 'white';
+                btnTop5.style.background = 'white'; btnTop5.style.color = '#764ba2';
+            }
         }
     </script>
 </body>
