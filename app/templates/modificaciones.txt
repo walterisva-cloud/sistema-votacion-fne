@@ -1,0 +1,8 @@
+modificar el index solo q salga Eleccion reyna 2026 y candidatas
+de fondo logo de ente 
+en votar fondo de logo del ente
+desabilitar las q ya se emitio el voto
+doble pregunta de seguro enviar
+agregar los puntos por categoria en resultados
+poner logo del ente 2026
+

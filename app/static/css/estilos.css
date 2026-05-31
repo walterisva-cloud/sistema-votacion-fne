@@ -1,0 +1,368 @@
+/* =========================================
+   1. RESET Y CONFIGURACIÓN GENERAL
+   ========================================= */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)), 
+                url("/static/img/fondo4.webp") no-repeat center center fixed;
+    background-size: cover;
+    min-height: 100vh;
+}
+
+h1, h2 {
+    color: #4a148c;
+    text-shadow: 2px 2px 5px rgba(255, 255, 255, 0.9);
+    text-align: center;
+}
+
+/* =========================================
+   2. BARRA DE NAVEGACIÓN (NAVBAR)
+   ========================================= */
+.navbar-global {
+    background: rgba(255, 255, 255, 0.98);
+    padding: 12px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    border-bottom: 3px solid #6a1b9a;
+}
+
+.user-welcome {
+    font-size: 1.1rem;
+    color: #333;
+    font-weight: 500;
+}
+
+.user-welcome b {
+    color: #6a1b9a;
+    text-transform: capitalize;
+}
+
+.nav-actions {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+/* Botones de la Navbar */
+.btn-logout {
+    background: #4a148c;
+    color: white !important;
+    padding: 8px 18px;
+    border-radius: 20px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 0.9rem;
+    transition: 0.3s;
+}
+
+.btn-logout:hover {
+    background: #5a20a1;
+    box-shadow: 0 4px 8px rgba(255, 23, 68, 0.3);
+}
+
+.btn-link-simple {
+    text-decoration: none;
+    color: #6a1b9a;
+    font-weight: bold;
+}
+
+/* =========================================
+   3. COMPONENTES REUTILIZABLES (CARDS)
+   ========================================= */
+.card-base {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    transition: transform 0.3s ease;
+}
+
+.card-base:hover {
+    transform: translateY(-5px);
+}
+
+/* =========================================
+   4. PANTALLA PRINCIPAL (INDEX)
+   ========================================= */
+.grid-candidatas {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 30px;
+    max-width: 1000px; /* Un poco más ancho para que luzcan las fotos */
+    margin: 40px auto;
+    padding: 20px;
+}
+
+.card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3); /* Sombra para resaltar */
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px); /* Efecto de levante al pasar el mouse */
+}
+
+.card-media {
+    position: relative; /* Necesario para el overlay */
+    height: 320px; /* Aumentamos el tamaño */
+}
+
+.img-candidata-index {
+    width: 100%;
+    object-position: 50% 10%;
+    object-fit: cover;
+}
+
+/* Efecto Overlay que copiaste */
+.info-candidata-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    /* Graduamos el fondo oscuro para que el botón resalte */
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 30%, transparent);
+    color: white;
+    padding: 60px 0 20px 0; /* Más espacio abajo */
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.info-candidata-overlay h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.card-footer {
+    padding: 15px;
+    text-align: center;
+    background: #f8f9fa;
+}
+
+.btn-votar {
+    display: inline-block;
+    padding: 8px 25px;
+    background: #6a1b9a; /* Violeta fuerte */
+    color: white !important;
+    text-decoration: none;
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 0.9rem;
+    transition: 0.3s;
+    border: 2px solid white; /* Borde blanco para que no se pierda */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.btn-votar:hover {
+    background: #4a148c;
+    transform: scale(1.1);
+}
+
+.card-votada {
+    filter: grayscale(0.8);
+    opacity: 0.8;
+}
+
+
+/* Opcional: Para que en celulares se vea una sola si el espacio es muy poco */
+@media (max-width: 500px) {
+    .grid-candidatas {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* =========================================
+   5. PANTALLA DE VOTACIÓN (VOTAR) - PROPORCIONAL
+   ========================================= */
+
+body.votar-page {
+    margin: 0;
+    height: 100vh; /* Altura fija de la pantalla */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Evita scroll general */
+    background-attachment: fixed;
+}
+
+.votar-container {
+    display: flex;
+    flex: 1;
+    gap: 15px;
+    padding: 10px;
+    min-height: 0; /* Permite que los hijos se achiquen */
+}
+
+/* Columnas Proporcionales */
+.candidata-column {
+    flex: 1.2; /* La foto es un poco más ancha que el panel */
+    display: flex;
+    min-height: 0;
+}
+
+.puntuacion-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Tarjeta de Foto con Proporción */
+.card-votar-foto {
+    background: white;
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%; /* Ocupa todo el alto de su columna */
+}
+
+.contenedor-img {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+}
+
+.foto-votar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Cubre el espacio sin deformarse */
+    object-position: center 10%;
+}
+
+/* Panel de Puntuación Ajustable */
+.form-puntuacion {
+    background: white;
+    padding: 20px;
+    border-radius: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+/* Este contenedor envolverá todas las categorías (Belleza, Simpatía, etc.) */
+.categorias-wrapper {
+    flex: 1; /* Esto ocupa todo el espacio sobrante empujando el botón al final */
+    overflow-y: auto; /* Si por alguna razón no cabe, el scroll solo será interno aquí */
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around; /* Reparte el aire entre categorías */
+}
+
+.categoria-box {
+    margin-bottom: 20px;
+}
+
+.categoria-titulo {
+    font-weight: bold;
+    color: #6a1b9a;
+    font-size: 1rem;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.btn-enviar-voto {
+    background: #6a1b9a;
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    cursor: pointer;
+    width: 100%;
+}
+
+/* Contenedor en cuadrícula de 5 columnas */
+.grid-puntos {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* 5 botones por fila */
+    gap: 8px; /* Espacio entre botones */
+    margin-top: 10px;
+}
+
+/* Ocultamos el circulito del radio button */
+.grid-puntos input[type="radio"] {
+    display: none;
+}
+
+/* El número como botón */
+.grid-puntos label {
+    display: block;
+    background: #f3e5f5; /* Violeta muy clarito */
+    color: #4a148c;
+    padding: 10px 0;
+    text-align: center;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+/* Efecto cuando el juez pasa el mouse */
+.grid-puntos label:hover {
+    background: #e1bee7;
+}
+
+/* EFECTO CUANDO SE SELECCIONA EL NÚMERO */
+.grid-puntos input[type="radio"]:checked + label {
+    background: #6a1b9a; /* Violeta fuerte */
+    color: white;
+    transform: scale(1.05); /* Se agranda un poquito */
+    box-shadow: 0 4px 10px rgba(106, 27, 154, 0.3);
+}
+
+/* =========================================
+   6. MODO CELULAR (RESPONSIVE EXTREMO)
+   ========================================= */
+
+@media (max-width: 768px) {
+    .votar-container {
+        flex-direction: column;
+        overflow-y: auto; /* Permitimos scroll en el celular para llegar al botón */
+        height: auto;
+    }
+
+    .candidata-column {
+        height: 50vh; /* La foto ocupa la mitad de la pantalla real del celular */
+        min-height: 350px;
+        flex: none; /* Evita que flexbox la achique */
+    }
+
+    .puntuacion-column {
+        height: auto;
+        flex: none;
+    }
+    
+    .grid-puntos label {
+        padding: 15px 0; /* Más fácil de tocar con el dedo */
+    }
+}
+
+/* Ajuste para pantallas muy bajas (Laptops) */
+@media (max-height: 700px) and (min-width: 769px) {
+    .form-puntuacion h2 { font-size: 1.1rem; margin: 0; }
+    .categoria-titulo { font-size: 0.8rem; margin-bottom: 2px; }
+    .categoria-box { margin-bottom: 5px; }
+    .grid-puntos label { padding: 5px 0; }
+}

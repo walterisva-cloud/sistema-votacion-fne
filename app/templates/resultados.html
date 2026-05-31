@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="15"> 
+    <title>Resultados FNE 2026 - Secundario 43</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
+        
+        .card-resultados { 
+            background: white; max-width: 950px; margin: auto; 
+            padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+        }
+
+        .header-resultados {
+            display: grid;
+            grid-template-columns: 80px 1fr 80px; /* Tres columnas: logo, centro, y espacio vacío */
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .header-resultados div {
+            grid-column: 2; /* Fuerza al div del título a la columna central */
+            text-align: center;
+        }
+
+        .logo-fne { max-width: 80px; height: auto; }
+
+       /* Busca la clase .podio y reemplázala o añade esto */
+        .podio {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+            flex-wrap: wrap; /* Esto permite que los items bajen si no caben */
+        }
+
+        .honor-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-top: 4px solid #764ba2;
+            flex: 1;
+            min-width: 200px; /* Evita que se encojan demasiado */
+        }
+
+        .reina-card { border-top-color: #ffd700; transform: scale(1.05); background: #fffdf0; box-shadow: 0 5px 15px rgba(212, 175, 55, 0.2); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.95em; }
+        th { background-color: #764ba2; color: white; padding: 12px; }
+        td { padding: 12px; border-bottom: 1px solid #eee; text-align: center; }
+        
+        .tabla-responsiva {
+            width: 100%;
+            overflow-x: auto; /* Crea el scroll lateral solo en la tabla si es necesario */
+            -webkit-overflow-scrolling: touch;
+            margin-top: 10px;
+        }
+
+        .total-cell { color: #764ba2; font-weight: bold; font-size: 1.1em; background: #f9f6ff; }
+
+        .btn-print {
+            background: #28a745; color: white; border: none; padding: 12px 25px;
+            border-radius: 8px; font-weight: bold; cursor: pointer;
+            display: block; margin: 20px auto; transition: 0.3s;
+        }
+
+        @media print {
+            .btn-volver, .btn-print, button, .header-resultados a, form { display: none !important; }
+            body { background: white; padding: 0; }
+            .card-resultados { box-shadow: none; max-width: 100%; border: none; }
+            .reina-card { border: 2px solid #ffd700 !important; }
+        }
+
+        @media (max-width: 600px) {
+            .card-resultados {
+                padding: 15px; /* Menos espacio interno */
+            }
+            
+            .podio {
+                flex-direction: column; /* Apila el podio verticalmente */
+            }
+            
+            .reina-card {
+                order: -1; /* Forza a que la Reina aparezca siempre arriba en el celular */
+                transform: scale(1); /* Quitamos el scale para que no se corte */
+                margin-bottom: 10px;
+            }
+
+            th, td {
+                padding: 8px 5px; /* Celdas más compactas */
+                font-size: 0.85em;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+    <nav class="navbar-global">
+        <div class="user-welcome">
+            Bienvenido, <b>{{ juez }}</b>
+        </div>
+        <div class="nav-actions">
+            <a href="/" class="btn-link-simple">Volver al Inicio</a>
+            <a href="/logout" class="btn-logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="card-resultados">
+        
+        {% if es_admin %}
+        <div style="background: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #764ba2; box-shadow: 0 4px 12px rgba(118, 75, 162, 0.1);">
+            <h3 style="margin: 0 0 15px 0; color: #4a148c; font-size: 1.1em;">⚙️ Configuración del Evento - FNE 2026</h3>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between;">
+                
+                <form action="/cambiar_evento" method="POST" style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 0.9em; font-weight: bold; color: #555;">Elección Activa:</span>
+                    <div style="display: flex; border-radius: 8px; overflow: hidden; border: 1px solid #764ba2;">
+                        <button type="submit" name="tipo" value="0" 
+                            style="padding: 8px 15px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s;
+                            background: {{ '#764ba2' if genero_evento == 'F' else 'white' }}; 
+                            color: {{ 'white' if genero_evento == 'F' else '#764ba2' }};">
+                            👸 Reina
+                        </button>
+                        <button type="submit" name="tipo" value="1" 
+                            style="padding: 8px 15px; border: none; cursor: pointer; font-weight: bold; transition: 0.3s;
+                            background: {{ '#764ba2' if genero_evento == 'M' else 'white' }}; 
+                            color: {{ 'white' if genero_evento == 'M' else '#764ba2' }};">
+                            🤴 Chico 10
+                        </button>
+                    </div>
+                </form>
+
+                <form action="/toggle_resultados" method="POST" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="hidden" name="estado" value="{{ '0' if resultados_habilitados else '1' }}">
+                    <span style="font-size: 0.9em; font-weight: bold; color: #555;">Visibilidad:</span>
+                    <button type="submit" style="border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; color: white;
+                        background: {{ '#f44336' if resultados_habilitados else '#4caf50' }};">
+                        {{ '🔒 Privar Resultados' if resultados_habilitados else '🚀 Publicar Resultados' }}
+                    </button>
+                </form>
+            </div>
+
+            {% if hay_empate %}
+            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; font-size: 0.85em; border-radius: 4px;">
+                <strong>⚠️ ATENCIÓN:</strong> Hay un empate técnico. Revise los criterios antes de anunciar al ganador.
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="header-resultados">
+            <img src="{{ url_for('static', filename='img/logofne2026.webp') }}" class="logo-fne" alt="Logo FNE">
+            <div>
+                <h1 style="color: #4a148c; margin: 0;">
+                    📊 {{ 'Posiciones Chico 10' if genero_evento == 'M' else 'Posiciones Elección Reina' }}
+                </h1>
+                <small style="color: #666;">FNE 2026 - Colegio Secundario N° 43</small>
+            </div>
+        </div>
+
+        <div class="podio">
+            {% if ranking|length > 0 %}
+                <div class="honor-item">
+                    <b style="color: #764ba2;">{{ '1er Puesto' if genero_evento == 'M' else '1ra Princesa' }}</b><br>
+                    <span style="font-weight: bold;">{{ ranking[1].nombre if ranking|length >= 2 else '---' }}</span><br>
+                    <small style="color: #666;">{{ ranking[1].total if ranking|length >= 2 else '0' }} pts</small>
+                </div>
+
+                <div class="honor-item reina-card">
+                    <b style="color: #d4af37; font-size: 1.1em;">
+                        {{ '👑 Chico 10' if genero_evento == 'M' else '👑 Reina' }}
+                    </b><br>
+                    <span style="font-size: 1.3em; font-weight: bold; color: #4a148c;">
+                        {{ ranking[0].nombre if ranking|length >= 1 else 'Pendiente' }}
+                    </span><br>
+                    <span style="color: #764ba2; font-weight: bold;">{{ ranking[0].total if ranking|length >= 1 else '0' }} puntos</span>
+                </div>
+
+                <div class="honor-item">
+                    <b style="color: #764ba2;">{{ '2do Puesto' if genero_evento == 'M' else '2da Princesa' }}</b><br>
+                    <span style="font-weight: bold;">{{ ranking[2].nombre if ranking|length >= 3 else '---' }}</span><br>
+                    <small style="color: #666;">{{ ranking[2].total if ranking|length >= 3 else '0' }} pts</small>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="tabla-responsiva">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="text-align: left;">{{ 'Candidato' if genero_evento == 'M' else 'Candidata' }}</th>
+                        <th>Belleza</th> 
+                        <th>Simpatía</th>
+                        <th>Elegancia</th>
+                        <th>TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fila in ranking %}
+                    <tr>
+                        <td style="font-weight: bold; text-align: left;">{{ fila.nombre }}</td>
+                        <td>{{ fila.belleza or 0 }}</td> 
+                        <td>{{ fila.simpatia or 0 }}</td>
+                        <td>{{ fila.elegancia or 0 }}</td>
+                        <td class="total-cell">{{ fila.total or 0 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if es_admin %}
+            <button onclick="window.print()" class="btn-print">
+                🖨️ Imprimir Acta de Resultados
+            </button>
+
+            <button onclick="toggleDetalle()" style="background: none; border: none; color: #888; cursor: pointer; width: 100%; margin-top: 15px; font-size: 0.9em; text-decoration: underline;">
+                Ver detalle de votos de jueces 🔍
+            </button>
+        {% endif %}
+
+        <div id="detalle-jueces" style="display: none; margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 15px; background: #fafafa; border-radius: 8px; padding: 15px;">
+            <h3 style="font-size: 1em; color: #4a148c; margin-top: 0;">Historial de Actividad:</h3>
+            <ul style="font-size: 0.85em; color: #555; list-style: none; padding: 0; line-height: 1.6;">
+                {% for p in participacion %}
+                    <li style="margin-bottom: 5px;">✅ El/La docente <strong>{{ p.juez }}</strong> registró calificación para <strong>{{ p.candidata }}</strong></li>
+                {% else %}
+                    <li style="color: #999;">No hay votos registrados todavía.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function toggleDetalle() {
+            let x = document.getElementById("detalle-jueces");
+            x.style.display = (x.style.display === "none") ? "block" : "none";
+        }
+    </script>
+</body>
+</html>

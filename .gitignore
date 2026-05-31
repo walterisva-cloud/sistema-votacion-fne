@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Docker & Base de datos (¡Para no subir tus imágenes físicas ni contraseñas!)
+.env
+db_data/
+
+# Entorno de desarrollo
+.vscode/
+.idea/

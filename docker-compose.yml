@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: db_votacion
+    restart: always
+    # FORZAMOS UTF8 DESDE EL ARRANQUE DEL MOTOR
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: sistema_votos
+      MYSQL_ROOT_PASSWORD: root_password_segura
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql-init:/docker-entrypoint-initdb.d
+      - db_data:/var/lib/mysql # Agregamos un volumen nombrado para mejor manejo
+
+  web:
+    build: ./app
+    container_name: app_votacion
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: root_password_segura
+      DB_NAME: sistema_votos
+      # FORZAMOS A PYTHON A USAR UTF-8 PARA EL SISTEMA OPERATIVO DEL CONTENEDOR
+      PYTHONIOENCODING: utf-8
+      LANG: C.UTF-8
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  db_data: # Definición del volumen persistente

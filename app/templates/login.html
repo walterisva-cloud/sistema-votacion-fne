@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Jueces</title>
+    <style>
+        body { background: #667eea; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }
+        .login-card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { background: #764ba2; color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>Sistema de Votación</h2>
+        <p>Por favor, identifíquese</p>
+        <form action="/login" method="POST">
+            <input type="text" name="nombre" placeholder="Nombre de Juez" required>
+            <input type="password" name="pin" placeholder="PIN de Seguridad" required>
+            <button type="submit">Ingresar al Panel</button>
+        </form>
+    </div>
+</body>
+</html>

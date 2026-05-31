@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Votar - {{ candidata.nombre }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
+</head>
+<body class="votar-page">
+    <header>
+        <nav class="navbar-global">
+            <div class="user-welcome">
+                Bienvenido, <b>{{ juez }}</b>
+            </div>
+            
+            <div class="nav-actions">
+                <a href="/" class="btn-link-simple">Volver al Inicio</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="votar-container">
+        <section class="candidata-column">
+            <div class="card-votar-foto">
+                <div class="contenedor-img">
+                    <img src="{{ url_for('static', filename='img/' ~ candidata.foto) }}" class="foto-votar">
+                    
+                    <div class="info-candidata-overlay">
+                        <h2>{{ candidata.nombre }}</h2>
+                        <p>{% if candidata.genero == 'M' %} Candidato N° {% else %} Candidata N° {% endif %} {{ candidata.numero_orden }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <form id="formVotacion" class="form-puntuacion" method="POST" action="{{ url_for('guardar_voto') }}"> 
+            <input type="hidden" name="candidata_id" value="{{ candidata.id }}">
+
+            <h2>Panel de Puntuación</h2>
+            
+            <div class="categorias-wrapper"> 
+                
+                <div class="categoria-box">
+                    <div class="categoria-titulo">✨ Belleza</div>
+                    <div class="grid-puntos">
+                        {% for i in range(1, 11) %}
+                        <input type="radio" name="cat_belleza" id="bel{{ i }}" value="{{ i }}" required>
+                        <label for="bel{{ i }}">{{ i }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="categoria-box">
+                    <div class="categoria-titulo">😊 Simpatía</div>
+                    <div class="grid-puntos">
+                        {% for i in range(1, 11) %}
+                        <input type="radio" name="cat_simpatia" id="sim{{ i }}" value="{{ i }}" required>
+                        <label for="sim{{ i }}">{{ i }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="categoria-box">
+                    <div class="categoria-titulo">💃 Elegancia</div>
+                    <div class="grid-puntos">
+                        {% for i in range(1, 11) %}
+                        <input type="radio" name="cat_elegancia" id="ele{{ i }}" value="{{ i }}" required>
+                        <label for="ele{{ i }}">{{ i }}</label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+
+            <button type="submit" class="btn-enviar-voto" onclick="confirmarVotacion(event)">
+                Confirmar Votación
+            </button>
+        </form>
+       
+    </main>
+
+    <div id="modalConfirmacion" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:30px; border-radius:15px; max-width:400px; width:90%; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+            <h3 style="color:#4a148c; margin-top:0;">Revisar Votación</h3>
+            <p style="color:#666;">Has seleccionado los siguientes puntos para <strong>{{ candidata.nombre }}</strong>:</p>
+            
+            <div style="background:#f8f9fa; padding:15px; border-radius:10px; margin:20px 0; text-align:left; font-size:1.1em;">
+                <p>✨ <strong>Belleza:</strong> <span id="resumenBelleza">0</span></p>
+                <p>😊 <strong>Simpatía:</strong> <span id="resumenSimpatia">0</span></p>
+                <p>💃 <strong>Elegancia:</strong> <span id="resumenElegancia">0</span></p>
+                <hr>
+                <p style="text-align:center; margin-bottom:0; font-size: 1.2em;">
+                    <strong>Total: <span id="resumenTotal" style="color:#4a148c; font-size: 1.3em;">0</span> puntos</strong>
+                </p>
+            </div>
+
+            <div style="display:flex; gap:12px; margin-top: 10px;">
+                <button onclick="cerrarModal()" 
+                        style="flex:1; padding:12px; border:none; background:#f0f0f0; color:#555; border-radius:8px; cursor:pointer; font-weight:bold; transition: 0.3s;">
+                    Corregir
+                </button>
+                
+                <button onclick="enviarFormularioReal()" 
+                        style="flex:1; padding:12px; border:none; background:#764ba2; color:white; border-radius:8px; cursor:pointer; font-weight:bold; shadow: 0 4px 10px rgba(118, 75, 162, 0.3); transition: 0.3s;">
+                    Confirmar y Enviar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function confirmarVotacion(event) {
+            // Evitamos que el formulario se envíe directamente
+            event.preventDefault();
+
+            // Obtenemos los valores seleccionados de los radio buttons
+            const b = document.querySelector('input[name="cat_belleza"]:checked')?.value || 0;
+            const s = document.querySelector('input[name="cat_simpatia"]:checked')?.value || 0;
+            const e = document.querySelector('input[name="cat_elegancia"]:checked')?.value || 0;
+            const total = parseInt(b) + parseInt(s) + parseInt(e);
+
+            // Inyectamos los valores en el modal
+            document.getElementById('resumenBelleza').innerText = b;
+            document.getElementById('resumenSimpatia').innerText = s;
+            document.getElementById('resumenElegancia').innerText = e;
+            document.getElementById('resumenTotal').innerText = total;
+
+            // Mostramos el modal
+            document.getElementById('modalConfirmacion').style.display = 'flex';
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalConfirmacion').style.display = 'none';
+        }
+
+        function enviarFormularioReal() {
+            // Buscamos el formulario por su ID y lo enviamos
+            document.getElementById('formVotacion').submit();
+        }
+    </script>
+</body>
+</html>
