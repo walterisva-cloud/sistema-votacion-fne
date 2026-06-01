@@ -33,7 +33,7 @@
             </div>
         </section>
 
-        <form id="formVotacion" class="form-puntuacion" method="POST" action="{{ url_for('guardar_voto') }}"> 
+       <form id="formVotacion" class="form-puntuacion" method="POST" action="{{ url_for('guardar_voto') }}"> 
             <input type="hidden" name="candidata_id" value="{{ candidata.id }}">
 
             <h2>Panel de Puntuación</h2>
@@ -44,7 +44,8 @@
                     <div class="categoria-titulo">✨ Belleza</div>
                     <div class="grid-puntos">
                         {% for i in range(1, 11) %}
-                        <input type="radio" name="cat_belleza" id="bel{{ i }}" value="{{ i }}" required>
+                        <input type="radio" name="cat_belleza" id="bel{{ i }}" value="{{ i }}" required
+                            {% if candidata.cat_belleza == i %} checked {% endif %}>
                         <label for="bel{{ i }}">{{ i }}</label>
                         {% endfor %}
                     </div>
@@ -54,7 +55,8 @@
                     <div class="categoria-titulo">😊 Simpatía</div>
                     <div class="grid-puntos">
                         {% for i in range(1, 11) %}
-                        <input type="radio" name="cat_simpatia" id="sim{{ i }}" value="{{ i }}" required>
+                        <input type="radio" name="cat_simpatia" id="sim{{ i }}" value="{{ i }}" required
+                            {% if candidata.cat_simpatia == i %} checked {% endif %}>
                         <label for="sim{{ i }}">{{ i }}</label>
                         {% endfor %}
                     </div>
@@ -64,7 +66,8 @@
                     <div class="categoria-titulo">💃 Elegancia</div>
                     <div class="grid-puntos">
                         {% for i in range(1, 11) %}
-                        <input type="radio" name="cat_elegancia" id="ele{{ i }}" value="{{ i }}" required>
+                        <input type="radio" name="cat_elegancia" id="ele{{ i }}" value="{{ i }}" required
+                            {% if candidata.cat_elegancia == i %} checked {% endif %}>
                         <label for="ele{{ i }}">{{ i }}</label>
                         {% endfor %}
                     </div>

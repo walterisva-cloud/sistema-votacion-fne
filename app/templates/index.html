@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
-    <title>Elección de Chico 10 -2026-</title>
+    <title>{% if genero_evento == 'M' %} Elección Chico 10 {% else %} Elección Reina {% endif %}</title>
 </head>
 <body>
     <nav class="navbar-global">
@@ -41,7 +41,8 @@
 
    <div class="grid-candidatas">
         {% for c in candidatas %}
-            {% set ya_votado = c.id in votos_realizados %}
+            {% set ya_votado = (c.id in votos_realizados) and not modo_correccion %}
+            {% set existia_voto = c.id in votos_realizados %}
             
             <div class="card {{ 'card-votada' if ya_votado else '' }}">
                 <div class="card-media">
@@ -50,17 +51,31 @@
                     <div class="info-candidata-overlay">
                         <h2>{{ c.nombre }}</h2>
                         
-                        {% if ya_votado %}
-                            <p class="status-voto">✅ Calificación Enviada</p>
-                            <button class="btn-disabled" disabled>Votado</button>
-                        {% else %}
-                            <a href="/votar/{{ c.id }}" class="btn-votar">Votar</a>
-                        {% endif %}
+                        <div class="contenedor-acciones-voto">
+                            {% if ya_votado %}
+                                <p class="status-voto">✅ Calificación Enviada</p>
+                                <a href="/votar/{{ c.id }}" class="btn-votar btn-disabled-link" style="pointer-events: none; opacity: 0.6; background: #6c757d;">Modificar Voto</a>
+                            {% elif modo_correccion and existia_voto %}
+                                <p class="status-voto" style="color: #ffc107;">📝 Modificación Permitida</p>
+                                <a href="/votar/{{ c.id }}" class="btn-votar" style="background: #764ba2;">Corregir</a>
+                            {% else %}
+                                <a href="/votar/{{ c.id }}" class="btn-votar">Votar</a>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
         {% endfor %}
     </div>
+
+    {% if ya_voto_a_todos and not modo_correccion %}
+    <div style="text-align: center; margin: 40px 0;">
+        <button type="button" id="btnModificarCartelera" onclick="desbloquearCartelera()" 
+                style="background: #ffc107; color: #333; border: none; padding: 14px 30px; border-radius: 30px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.15); font-size: 1em; transition: 0.3s;">
+            ✏️ Habilitar Corrección / Modificar Votos
+        </button>
+    </div>
+    {% endif %}
 
    <div class="footer-status" style="text-align: center; margin-top: 40px; padding: 30px;">
         {% if resultados_habilitados %}
@@ -91,6 +106,42 @@
                 setTimeout(() => mensaje.remove(), 600);
             }
         }, 3000);
+
+        function desbloquearCartelera() {
+            let tarjetasBloqueadas = document.querySelectorAll('.card-votada');
+            
+            if (tarjetasBloqueadas.length === 0) {
+                alert("La cartelera ya se encuentra habilitada para modificar.");
+                return;
+            }
+
+            // 💡 NUEVO: Le avisamos de forma asíncrona al backend que recuerde este estado en la sesión
+            fetch('/activar_correccion_sesion', { method: 'POST' });
+
+            tarjetasBloqueadas.forEach(tarjeta => {
+                tarjeta.classList.remove('card-votada');
+                tarjeta.style.opacity = "1";
+                tarjeta.style.filter = "none";
+                
+                let statusTexto = tarjeta.querySelector('.status-voto');
+                if (statusTexto) {
+                    statusTexto.innerHTML = "📝 Modificación Permitida";
+                    statusTexto.style.color = "#ffc107";
+                }
+
+                let linkVotar = tarjeta.querySelector('.btn-votar');
+                if (linkVotar) {
+                    linkVotar.style.pointerEvents = "auto";
+                    linkVotar.style.opacity = "1";
+                    linkVotar.style.background = "#764ba2"; 
+                    linkVotar.innerText = "Corregir";
+                }
+            });
+
+            document.getElementById('btnModificarCartelera').style.display = 'none';
+            alert("¡Modo Corrección Activado! Todas las tarjetas han sido liberadas. Seleccione al participante que desee corregir.");
+        }
+
     </script>
 </body>
 </html>

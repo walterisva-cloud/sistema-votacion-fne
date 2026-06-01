@@ -98,6 +98,7 @@ def index():
         return redirect(url_for('login'))
     
     genero_actual = obtener_tipo_evento()
+    juez_id = session['juez_id']
     
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -121,11 +122,26 @@ def index():
         candidatas.append(candidata_limpia)
     # ---------------------------------------------------
     
-    cursor.execute("SELECT candidata_id FROM votos WHERE juez_id = %s", (session['juez_id'],))
+    # Obtenemos los IDs de los votos realizados por este juez
+    cursor.execute("SELECT candidata_id FROM votos WHERE juez_id = %s", (juez_id,))
     votos_realizados = [v['candidata_id'] for v in cursor.fetchall()]
     
     cursor.close()
     conn.close()
+    
+    # --- 💡 LÓGICA DE CONTROL EN MEMORIA (PYTHON PURO) ---
+    # 1. Obtenemos un conjunto (set) de todos los IDs de los candidatos del evento actual
+    ids_candidatas_evento = {c['id'] for c in candidatas}
+    
+    # 2. Filtramos los votos realizados por el juez que correspondan SOLAMENTE al género activo
+    # (Esto evita problemas si quedaron votos viejos guardados en la base de datos de otros eventos)
+    votos_filtrados_genero = [vid for vid in votos_realizados if vid in ids_candidatas_evento]
+    
+    # 3. Comparamos si la cantidad de votos de este género es igual o mayor a la cantidad de participantes
+    ya_voto_a_todos = (len(votos_filtrados_genero) >= len(ids_candidatas_evento)) and (len(ids_candidatas_evento) > 0)
+
+    # Al final de la ruta, antes del render_template, agregamos esta línea:
+    modo_correccion = session.get('modo_correccion', False)
     
     return render_template('index.html', 
                            candidatas=candidatas, 
@@ -133,7 +149,14 @@ def index():
                            juez=session['juez_nombre'],
                            resultados_habilitados=obtener_estado_resultados(),
                            es_admin=session.get('es_admin'),
-                           genero_evento=genero_actual)
+                           genero_evento=genero_actual,
+                           ya_voto_a_todos=ya_voto_a_todos,
+                           modo_correccion=modo_correccion) # <-- PASAMOS ESTA NUEVA VARIABLE
+    
+@app.route('/activar_correccion_sesion', methods=['POST'])
+def activar_correccion_sesion():
+    session['modo_correccion'] = True
+    return {'status': 'success'}, 200
 
 # --- NUEVA RUTA PARA EL ADMIN ---
 @app.route('/toggle_resultados', methods=['POST'])
@@ -179,21 +202,29 @@ def votar(id):
     if 'juez_id' not in session:
         return redirect(url_for('login'))
         
+    juez_id = session['juez_id']
+    genero_actual = obtener_tipo_evento() # Obtenemos si es 'F' o 'M'
+        
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    # Usamos buffered=True para evitar desincronizaciones si hay subconsultas
+    cursor = conn.cursor(dictionary=True, buffered=True)
     
-    # Esta consulta calcula la posición en tiempo real sin tocar la estructura de la BD
+    # 1. Traemos los datos del candidato e incluimos sus votos previos si existen
     query = """
-    SELECT id, nombre, foto, genero, posicion AS numero_orden
+    SELECT 
+        c.id, c.nombre, c.foto, c.genero, sub.posicion AS numero_orden,
+        v.cat_belleza, v.cat_simpatia, v.cat_elegancia,
+        IF(v.id IS NOT NULL, 1, 0) as ya_votado
     FROM (
-        SELECT id, nombre, foto, genero,
-               ROW_NUMBER() OVER (PARTITION BY genero ORDER BY id) as posicion
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY genero ORDER BY id) as posicion
         FROM candidatas
-    ) subconsulta
-    WHERE id = %s;
+    ) sub
+    JOIN candidatas c ON c.id = sub.id
+    LEFT JOIN votos v ON c.id = v.candidata_id AND v.juez_id = %s
+    WHERE c.id = %s;
     """
     
-    cursor.execute(query, (id,))
+    cursor.execute(query, (juez_id, id))
     candidata_raw = cursor.fetchone()
     
     if not candidata_raw:
@@ -206,18 +237,36 @@ def votar(id):
         candidata['nombre'] = candidata_raw['nombre'].encode('latin1').decode('utf-8')
     except:
         pass
+
+    # 2. Control para habilitar el botón de modificación global
+    # Contamos cuántos participantes hay en total del género activo
+    cursor.execute("SELECT COUNT(1) as total FROM candidatas WHERE genero = %s", (genero_actual,))
+    total_candidatas = cursor.fetchone()['total']
+    
+    # Contamos cuántos votos ya cargó este juez para este género
+    cursor.execute("""
+        SELECT COUNT(1) as total FROM votos v
+        JOIN candidatas c ON v.candidata_id = c.id
+        WHERE v.juez_id = %s AND c.genero = %s
+    """, (juez_id, genero_actual))
+    total_votos_juez = cursor.fetchone()['total']
+    
+    # Si ya votó a todos, habilitamos la bandera para mostrar el botón en la plantilla
+    ya_voto_a_todos = (total_votos_juez >= total_candidatas) and (total_candidatas > 0)
         
     cursor.close()
     conn.close()
     
-    return render_template('votar.html', candidata=candidata)
+    return render_template('votar.html', 
+                           candidata=candidata, 
+                           ya_voto_a_todos=ya_voto_a_todos)
 
 @app.route('/guardar_voto', methods=['POST'])
 def guardar_voto():
     if 'juez_id' not in session:
         return redirect(url_for('login'))
 
-    # 1. Capturamos los datos del formulario con los nuevos nombres
+    # 1. Capturamos los datos del formulario
     c_id = request.form.get('candidata_id')
     v_belleza = request.form.get('cat_belleza')
     v_simpatia = request.form.get('cat_simpatia')
@@ -228,6 +277,8 @@ def guardar_voto():
         flash("Formulario incompleto. Por favor, selecciona todos los puntos.", "danger")
         return redirect(url_for('index'))
 
+    conn = None
+    cursor = None
     try:
         # 3. Conversión a números y cálculo del total
         c_id = int(c_id)
@@ -241,28 +292,43 @@ def guardar_voto():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 4. Ajustamos el SQL para usar las columnas correctas
-        # Nota: He mapeado cat_belleza, cat_simpatia y cat_elegancia
-        sql = """INSERT INTO votos 
-                 (juez_id, candidata_id, cat_belleza, cat_simpatia, cat_elegancia, total_puntos) 
-                 VALUES (%s, %s, %s, %s, %s, %s)"""
+        # 4. Ajustamos el SQL con ON DUPLICATE KEY UPDATE
+        # Si la combinación (juez_id, candidata_id) ya existe, se ejecutan los UPDATE correspondientes
+        sql = """
+            INSERT INTO votos 
+            (juez_id, candidata_id, cat_belleza, cat_simpatia, cat_elegancia, total_puntos) 
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                cat_belleza = VALUES(cat_belleza),
+                cat_simpatia = VALUES(cat_simpatia),
+                cat_elegancia = VALUES(cat_elegancia),
+                total_puntos = VALUES(total_puntos);
+        """
         
         cursor.execute(sql, (juez_id, c_id, b, s, e, total))
         conn.commit()
-        flash("¡Voto registrado con éxito!", "success")
+        
+        # Personalizamos el mensaje flash dependiendo de si se creó o se editó
+        if cursor.rowcount == 2:
+            flash("¡Calificación modificada con éxito!", "success")
+        else:
+            flash("¡Voto registrado con éxito!", "success")
 
     except mysql.connector.Error as err:
-        if err.errno == 1062: # Si el juez intenta votar dos veces a la misma
-            flash("Ya has emitido un voto para esta candidata.", "warning")
-        else:
-            print(f"Error en DB: {err}")
-            flash("Error al registrar el voto en la base de datos.", "danger")
+        if conn: conn.rollback() # Limpiamos cualquier estado pendiente en la transacción
+        print(f"Error en DB: {err}")
+        flash("Error al procesar el voto en la base de datos.", "danger")
     
     finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
+        # Cerramos correctamente en orden inverso para evitar el "Commands out of sync"
+        if cursor: 
+            try: cursor.close()
+            except: pass
+        if conn: 
+            try: conn.close()
+            except: pass
 
-    return redirect(url_for('index')) 
+    return redirect(url_for('index'))
     
 @app.route('/resultados')
 def resultados():
