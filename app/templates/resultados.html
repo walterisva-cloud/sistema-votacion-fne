@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="15"> 
-    <title>Resultados FNE 2026 - Secundario 43</title>
+    
+    <title>Resultados FNE 2026 - {{ colegio }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/estilos.css') }}">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
@@ -112,8 +112,20 @@
     <div class="card-resultados">
         
         {% if es_admin %}
+
         <div style="background: #ffffff; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 2px solid #764ba2; box-shadow: 0 4px 12px rgba(118, 75, 162, 0.1);">
-            <h3 style="margin: 0 0 15px 0; color: #4a148c; font-size: 1.1em;">⚙️ Configuración del Evento - FNE 2026</h3>
+            <div style="max-width: 950px; margin: 0 auto 20px auto; padding: 0 10px; display: flex; justify-content: space-between; align-items: center; background: rgba(118, 75, 162, 0.05); padding: 12px 20px; border-radius: 12px; border: 1px dashed #764ba2;">
+
+                <h3 style="color: #764ba2; margin: 0; font-size: 1.1em; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    ⚙️ Configuración del Evento
+                </h3>
+                
+                <a href="/admin/config-colegio" 
+                style="background: linear-gradient(135deg, #764ba2 0%, #667eea 100%); color: white; text-decoration: none; padding: 8px 18px; border-radius: 20px; font-weight: bold; font-size: 0.85em; box-shadow: 0 4px 12px rgba(118, 75, 162, 0.2); display: inline-flex; align-items: center; gap: 6px; transition: 0.3s; border: 1px solid rgba(255,255,255,0.1);">
+                    <span>Inicializar Próximo Colegio</span>
+                </a>
+                
+            </div>
             
             <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between;">
                 
@@ -153,71 +165,74 @@
         </div>
         {% endif %}
 
-        <div class="header-resultados">
-            <img src="{{ url_for('static', filename='img/logofne2026.webp') }}" class="logo-fne" alt="Logo FNE">
-            <div>
-                <h1 style="color: #4a148c; margin: 0;">
-                    📊 {{ 'Posiciones Chico 10' if genero_evento == 'M' else 'Posiciones Elección Reina' }}
-                </h1>
-                <small style="color: #666;">FNE 2026 - Colegio Secundario N° 43</small>
+        <div id="contenedor-dinamico">
+            <div class="header-resultados">
+                <img src="{{ url_for('static', filename='img/logofne2026.webp') }}" class="logo-fne" alt="Logo FNE">
+                <div>
+                    <h1 style="color: #4a148c; margin: 0;">
+                        📊 {{ 'Posiciones Chico 10' if genero_evento == 'M' else 'Posiciones Elección Reina' }}
+                    </h1>
+                    <small style="color: #666;">FNE 2026 - {{ colegio }}</small>
+                    
+                </div>
             </div>
-        </div>
 
-        <div class="podio">
-            {% if ranking|length > 0 %}
-                <div class="honor-item">
-                    <b style="color: #764ba2;">{{ '1er Puesto' if genero_evento == 'M' else '1ra Princesa' }}</b><br>
-                    <span style="font-weight: bold;">{{ ranking[1].nombre if ranking|length >= 2 else '---' }}</span><br>
-                    <small style="color: #666;">{{ ranking[1].total if ranking|length >= 2 else '0' }} pts</small>
-                </div>
+            <div class="podio">
+                {% if ranking|length > 0 %}
+                    <div class="honor-item">
+                        <b style="color: #764ba2;">{{ '1er Puesto' if genero_evento == 'M' else '1ra Princesa' }}</b><br>
+                        <span style="font-weight: bold;">{{ ranking[1].nombre if ranking|length >= 2 else '---' }}</span><br>
+                        <small style="color: #666;">{{ ranking[1].total if ranking|length >= 2 else '0' }} pts</small>
+                    </div>
 
-                <div class="honor-item reina-card">
-                    <b style="color: #d4af37; font-size: 1.1em;">
-                        {{ '👑 Chico 10' if genero_evento == 'M' else '👑 Reina' }}
-                    </b><br>
-                    <span style="font-size: 1.3em; font-weight: bold; color: #4a148c;">
-                        {{ ranking[0].nombre if ranking|length >= 1 else 'Pendiente' }}
-                    </span><br>
-                    <span style="color: #764ba2; font-weight: bold;">{{ ranking[0].total if ranking|length >= 1 else '0' }} puntos</span>
-                </div>
+                    <div class="honor-item reina-card">
+                        <b style="color: #d4af37; font-size: 1.1em;">
+                            {{ '👑 Chico 10' if genero_evento == 'M' else '👑 Reina' }}
+                        </b><br>
+                        <span style="font-size: 1.3em; font-weight: bold; color: #4a148c;">
+                            {{ ranking[0].nombre if ranking|length >= 1 else 'Pendiente' }}
+                        </span><br>
+                        <span style="color: #764ba2; font-weight: bold;">{{ ranking[0].total if ranking|length >= 1 else '0' }} puntos</span>
+                    </div>
 
-                <div class="honor-item">
-                    <b style="color: #764ba2;">{{ '2do Puesto' if genero_evento == 'M' else '2da Princesa' }}</b><br>
-                    <span style="font-weight: bold;">{{ ranking[2].nombre if ranking|length >= 3 else '---' }}</span><br>
-                    <small style="color: #666;">{{ ranking[2].total if ranking|length >= 3 else '0' }} pts</small>
-                </div>
-            {% endif %}
-        </div>
-
-        <div class="tabla-responsiva">
-            <!-- Botones de Paginación Interna -->
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button onclick="cambiarPagina('top5')" id="btn-top5" style="padding: 8px 16px; border-radius: 20px; border: 1px solid #764ba2; cursor: pointer; font-weight: bold; background: #764ba2; color: white;">⭐ Top 5 Puestos</button>
-                <button onclick="cambiarPagina('todos')" id="btn-todos" style="padding: 8px 16px; border-radius: 20px; border: 1px solid #764ba2; cursor: pointer; font-weight: bold; background: white; color: #764ba2;">📋 Ver Lista Completa</button>
+                    <div class="honor-item">
+                        <b style="color: #764ba2;">{{ '2do Puesto' if genero_evento == 'M' else '2da Princesa' }}</b><br>
+                        <span style="font-weight: bold;">{{ ranking[2].nombre if ranking|length >= 3 else '---' }}</span><br>
+                        <small style="color: #666;">{{ ranking[2].total if ranking|length >= 3 else '0' }} pts</small>
+                    </div>
+                {% endif %}
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="text-align: left;">{{ 'Candidato' if genero_evento == 'M' else 'Candidata' }}</th>
-                        <th>Belleza</th> 
-                        <th>Simpatía</th>
-                        <th>Elegancia</th>
-                        <th>TOTAL</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for fila in ranking %}
-                    <!-- Guardamos el índice del loop nativo de Jinja -->
-                    <tr class="fila-ranking" data-index="{{ loop.index }}">
-                        <td style="font-weight: bold; text-align: left;">{{ fila.nombre }}</td>
-                        <td>{{ fila.belleza or 0 }}</td> 
-                        <td>{{ fila.simpatia or 0 }}</td>
-                        <td>{{ fila.elegancia or 0 }}</td>
-                        <td class="total-cell">{{ fila.total or 0 }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+
+            <div class="tabla-responsiva">
+                <!-- Botones de Paginación Interna -->
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button onclick="cambiarPagina('top5')" id="btn-top5" style="padding: 8px 16px; border-radius: 20px; border: 1px solid #764ba2; cursor: pointer; font-weight: bold; background: #764ba2; color: white;">⭐ Top 5 Puestos</button>
+                    <button onclick="cambiarPagina('todos')" id="btn-todos" style="padding: 8px 16px; border-radius: 20px; border: 1px solid #764ba2; cursor: pointer; font-weight: bold; background: white; color: #764ba2;">📋 Ver Lista Completa</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">{{ 'Candidato' if genero_evento == 'M' else 'Candidata' }}</th>
+                            <th>Belleza</th> 
+                            <th>Simpatía</th>
+                            <th>Elegancia</th>
+                            <th>TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fila in ranking %}
+                        <!-- Guardamos el índice del loop nativo de Jinja -->
+                        <tr class="fila-ranking" data-index="{{ loop.index }}">
+                            <td style="font-weight: bold; text-align: left;">{{ fila.nombre }}</td>
+                            <td>{{ fila.belleza or 0 }}</td> 
+                            <td>{{ fila.simpatia or 0 }}</td>
+                            <td>{{ fila.elegancia or 0 }}</td>
+                            <td class="total-cell">{{ fila.total or 0 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         {% if es_admin %}
@@ -278,7 +293,7 @@
     </div>
 
     <script>
-        function toggleDetalle() {
+        function toggleJueces() {
             let x = document.getElementById("detalle-jueces");
             x.style.display = (x.style.display === "none") ? "block" : "none";
         }
@@ -286,6 +301,8 @@
         // Al cargar la página, mostramos por defecto solo el Top 5
         document.addEventListener("DOMContentLoaded", function() {
             cambiarPagina('top5');
+            // Activamos el temporizador inteligente en segundo plano cada 15 segundos
+            setInterval(actualizarResultadosEnSegundoPlano, 15000);
         });
 
         function cambiarPagina(modo) {
@@ -293,22 +310,65 @@
             let btnTop5 = document.getElementById('btn-top5');
             let btnTodos = document.getElementById('btn-todos');
 
+            if (!filas.length) return;
+
             if (modo === 'top5') {
                 filas.forEach(f => {
-                    // El data-index arranca en 1, ocultamos los mayores a 5
                     if (parseInt(f.getAttribute('data-index')) > 5) {
                         f.style.display = 'none';
                     } else {
                         f.style.display = '';
                     }
                 });
-                btnTop5.style.background = '#764ba2'; btnTop5.style.color = 'white';
-                btnTodos.style.background = 'white'; btnTodos.style.color = '#764ba2';
+                if(btnTop5 && btnTodos) {
+                    btnTop5.style.background = '#764ba2'; btnTop5.style.color = 'white';
+                    btnTodos.style.background = 'white'; btnTodos.style.color = '#764ba2';
+                }
             } else {
-                filas.forEach(f => f.style.display = ''); // Muestra todos sin restricciones
-                btnTodos.style.background = '#764ba2'; btnTodos.style.color = 'white';
-                btnTop5.style.background = 'white'; btnTop5.style.color = '#764ba2';
+                filas.forEach(f => f.style.display = '');
+                if(btnTop5 && btnTodos) {
+                    btnTodos.style.background = '#764ba2'; btnTodos.style.color = 'white';
+                    btnTop5.style.background = 'white'; btnTop5.style.color = '#764ba2';
+                }
             }
+        }
+
+        // 🌟 FUNCIÓN MAESTRA: Actualiza el podio sin tocar los formularios del Admin
+        function actualizarResultadosEnSegundoPlano() {
+            // Hacemos una petición silenciosa al mismo endpoint actual
+            fetch(window.location.href)
+                .then(response => response.text())
+                .then(html => {
+                    // Parseamos el HTML recibido del servidor
+                    let parser = new DOMParser();
+                    let doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Extraemos únicamente el nuevo contenedor de posiciones
+                    let nuevoContenido = doc.getElementById('contenedor-dinamico');
+                    let contenedorActual = document.getElementById('contenedor-dinamico');
+                    
+                    if (nuevoContenido && contenedorActual) {
+                        // Guardamos el estado actual del botón de paginación activo
+                        let btnTodos = document.getElementById('btn-todos');
+                        let modoActivo = (btnTodos && btnTodos.style.background.includes('rgb(118, 75, 162)')) ? 'todos' : 'top5';
+                        
+                        // Reemplazamos sutilmente el HTML de las posiciones vieja por las nuevas
+                        contenedorActual.innerHTML = nuevoContenido.innerHTML;
+                        
+                        // Re-aplicamos el filtro de paginación (Top 5 o Todos) para que no se desarme
+                        cambiarPagina(modoActivo);
+                    }
+                })
+                .catch(err => console.warn("Error actualizando pantalla de posiciones:", err));
+        }
+
+        // Confirmación doble de seguridad para el administrador
+        function confirmarCargaMasiva() {
+            const respuesta1 = confirm("¿Estás absolutamente seguro de realizar la carga masiva?\n\nEsta acción ELIMINARÁ por completo todos los votos registrados hasta el momento y la lista actual de candidatos.");
+            if (respuesta1) {
+                return confirm("⚠️ ÚLTIMA ADVERTENCIA ⚠️\n\n¿Estás seguro de que respaldaste los resultados del colegio anterior? Presiona Aceptar para formatear las tablas y cargar la nueva lista.");
+            }
+            return false;
         }
     </script>
 </body>

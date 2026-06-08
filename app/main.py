@@ -3,6 +3,9 @@ import mysql.connector
 import os
 import time
 from flask import flash # Agregá esto arriba en los imports
+import csv
+import io
+#from flask import render_template, request, redirect, url_for, flash, session
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False # Para que no convierta tildes a códigos raros en JSON
@@ -23,6 +26,7 @@ def add_header(response):
     if response.content_type.startswith('image'):
         response.cache_control.max_age = 3600
     return response
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -92,6 +96,118 @@ def obtener_tipo_evento():
     # '1' es Chico 10 (M), cualquier otra cosa es Reina (F)
     return 'M' if config and config['valor'] == '1' else 'F'
 
+# 💡 AGREGAR ESTA FUNCIÓN AUXILIAR PARA OBTENER EL NOMBRE DEL COLEGIO DINÁMICAMENTE
+def obtener_nombre_colegio():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT valor FROM configuracion WHERE id = 3")
+        res = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if res and res[0]:
+            return res[0]
+    except Exception as e:
+        print(f"Error al obtener colegio: {e}")
+    return "Secundario N° 43" # Nombre por defecto si no existe en la BD
+
+@app.route('/admin/config-colegio')
+def admin_config_colegio():
+    if not session.get('es_admin'):
+        flash("Acceso denegado.", "danger")
+        return redirect(url_for('index'))
+    
+    # Pasamos el nombre actual para que aparezca precargado en el input
+    colegio_actual = obtener_nombre_colegio()
+    return render_template('admin_carga.html', colegio_actual=colegio_actual)
+
+@app.route('/admin/cargar_masiva', methods=['POST'])
+def admin_cargar_masiva():
+    if not session.get('es_admin'):
+        flash("Acceso denegado.", "danger")
+        return redirect(url_for('index'))
+        
+    if 'archivo_csv' not in request.files:
+        flash("No se seleccionó ningún archivo.", "warning")
+        return redirect(url_for('admin_config_colegio'))
+
+    file = request.files['archivo_csv']
+    nombre_colegio = request.form.get('nombre_colegio', '').strip()
+
+    if file.filename == '' or not nombre_colegio:
+        flash("Formulario incompleto. Debes ingresar el nombre del colegio y el archivo.", "warning")
+        return redirect(url_for('admin_config_colegio'))
+
+    if file and file.filename.endswith('.csv'):
+        try:
+            contenido_bytes = file.stream.read()
+            texto_csv = contenido_bytes.decode("utf-8-sig")
+            
+            primera_linea = texto_csv.split('\n')[0] if texto_csv else ""
+            separador = ';' if ';' in primera_linea else ','
+            
+            stream = io.StringIO(texto_csv, newline=None)
+            reader = csv.DictReader(stream, delimiter=separador)
+
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            # 🌟 GUARDAR O ACTUALIZAR EL NOMBRE DEL COLEGIO (id = 3)
+            sql_colegio = """
+                INSERT INTO configuracion (id, nombre_config, valor) 
+                VALUES (3, 'nombre_colegio', %s) 
+                ON DUPLICATE KEY UPDATE valor = VALUES(valor);
+            """
+            cursor.execute(sql_colegio, (nombre_colegio,))
+
+            # Limpieza de las tablas de alumnos y votos
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
+            cursor.execute("TRUNCATE TABLE votos;")
+            cursor.execute("TRUNCATE TABLE candidatas;")
+
+            contador_f = 0
+            contador_m = 0
+
+            for row in reader:
+                key_nombre = next((k for k in row if k.strip().lower() == 'nombre'), None)
+                key_genero = next((k for k in row if k.strip().lower() == 'genero'), None)
+                
+                if not key_nombre or not key_genero or not row[key_nombre]:
+                    continue
+                    
+                nombre = row[key_nombre].strip()
+                genero = row[key_genero].strip().upper()
+
+                if genero == 'F':
+                    contador_f += 1
+                    foto_nombre = f"cand ({contador_f}).jpeg"
+                elif genero == 'M':
+                    contador_m += 1
+                    foto_nombre = f"chico ({contador_m}).jpeg"
+                else:
+                    foto_nombre = "default.jpg"
+
+                sql = "INSERT INTO candidatas (nombre, genero, foto) VALUES (%s, %s, %s)"
+                cursor.execute(sql, (nombre, genero, foto_nombre))
+
+            cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
+            conn.commit()
+            session.pop('modo_correccion', None)
+
+            flash(f"¡Inicialización exitosa para {nombre_colegio}! {contador_f} Mujeres y {contador_m} Varones.", "success")
+            
+        except Exception as e:
+            if 'conn' in locals() and conn: conn.rollback()
+            print(f"❌ Error en Carga Masiva: {e}")
+            flash(f"Error al procesar la inicialización: {str(e)}", "danger")
+        finally:
+            if 'cursor' in locals() and cursor: cursor.close()
+            if 'conn' in locals() and conn: conn.close()
+    else:
+        flash("Formato de archivo incorrecto.", "danger")
+
+    return redirect(url_for('index'))
+
 @app.route('/')
 def index():
     if 'juez_id' not in session:
@@ -151,7 +267,8 @@ def index():
                            es_admin=session.get('es_admin'),
                            genero_evento=genero_actual,
                            ya_voto_a_todos=ya_voto_a_todos,
-                           modo_correccion=modo_correccion) # <-- PASAMOS ESTA NUEVA VARIABLE
+                           modo_correccion=modo_correccion, # <-- PASAMOS ESTA NUEVA VARIABLE
+                           colegio=obtener_nombre_colegio())
     
 @app.route('/activar_correccion_sesion', methods=['POST'])
 def activar_correccion_sesion():
@@ -483,7 +600,8 @@ def resultados():
                                juez=session['juez_nombre'],
                                hay_empate=hay_empate,
                                estado_jueces=estado_jueces,
-                               todos_terminaron=todos_terminaron)
+                               todos_terminaron=todos_terminaron, 
+                               colegio=obtener_nombre_colegio())
 
     except mysql.connector.Error as err:
         print(f"Error en la base de datos: {err}")

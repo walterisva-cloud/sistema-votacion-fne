@@ -10,7 +10,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 CREATE TABLE IF NOT EXISTS configuracion (
     id INT PRIMARY KEY,
     nombre_config VARCHAR(50),
-    valor VARCHAR(10)
+    valor VARCHAR(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 INSERT INTO configuracion (id, nombre_config, valor) 
