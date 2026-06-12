@@ -111,6 +111,66 @@
             <input type="file" name="archivo_csv" id="archivo_csv" class="input-control input-file" 
                    accept=".csv, text/csv, application/csv, text/comma-separated-values" required>
         </div>
+
+        <!-- CHECKBOX INTERRUPTOR PARA DESPLEGAR JUECES -->
+        <div style="margin: 25px 0; text-align: left; padding: 15px; background: #f8f5fc; border-radius: 8px; border: 1px solid #ebdfff; display: flex; align-items: center; gap: 12px;">
+            <input type="checkbox" id="toggleJueces" style="width: 20px; height: 20px; cursor: pointer; accent-color: #764ba2;" onchange="alternarSeccionJueces()">
+            <label for="toggleJueces" style="color: #4a3766; font-weight: 600; cursor: pointer; user-select: none;">
+                ⚙️ Administrar Jueces / Jurados del Evento (Opcional)
+            </label>
+        </div>
+
+        <!-- CONTENEDOR CON ANIMACIÓN DE DESPLIEGUE (Oculto por defecto) -->
+        <div id="seccionJuecesContenedor" style="max-height: 0px; overflow: hidden; transition: max-height 0.4s ease-out; opacity: 0; transition: opacity 0.3s ease, max-height 0.4s ease-out;">
+            
+            <hr style="border: 0; height: 1px; background: #e2e8f0; margin: 30px 0;">
+            
+            <div style="font-size: 3.5em; margin-bottom: 10px;">👥</div>
+            <h2 style="color: #2c3e50; margin: 0 0 20px 0;">Gestión de Jueces</h2>
+
+            <!-- Formulario para agregar Juez -->
+            <form action="/admin/agregar_juez" method="POST" style="margin-bottom: 30px;">
+                <div class="form-group" style="text-align: left;">
+                    <label for="nombre_juez">Nombre Completo del Juez / Jurado:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="text" name="nombre_juez" id="nombre_juez" class="input-control" 
+                            placeholder="Ej: Ing. Juan Pérez" required style="flex: 1;">
+                        <button type="submit" class="btn-importar" style="margin: 0; width: auto; padding: 0 25px; white-space: nowrap;">
+                            ➕ Añadir
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Tabla de Control de Jueces del Evento -->
+            <h3 style="color: #3b2d54; text-align: left; font-size: 1.1em; margin-bottom: 10px;">Jueces Registrados y PINs:</h3>
+            <div style="max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95em;">
+                    <thead>
+                        <tr style="background: #f8f9fa; border-bottom: 2px solid #e2e8f0; color: #764ba2;">
+                            <th style="padding: 12px;">Nombre</th>
+                            <th style="padding: 12px; text-align: center; width: 100px;">PIN de Acceso</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if jueces %}
+                            {% for juez in jueces %}
+                            <tr style="border-bottom: 1px solid #edf2f7;">
+                                <td style="padding: 12px; color: #2d3748; font-weight: 500;">{{ juez.nombre }}</td>
+                                <td style="padding: 12px; text-align: center; color: #2b6cb0; font-weight: bold; font-family: monospace; font-size: 1.1em; background: #f7fafc;">
+                                    {{ juez.pin }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="2" style="padding: 20px; text-align: center; color: #a0aec0;">No hay jueces registrados todavía.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
         
         <button type="submit" class="btn-importar">
             🚀 Formatear e Inicializar Elección
@@ -129,6 +189,35 @@
         }
         return false;
     }
+    function alternarSeccionJueces() {
+        const checkbox = document.getElementById('toggleJueces');
+        const contenedor = document.getElementById('seccionJuecesContenedor');
+        
+        if (checkbox.checked) {
+            contenedor.style.maxHeight = contenedor.scrollHeight + "px";
+            contenedor.style.opacity = "1";
+            localStorage.setItem('panelJuecesAbierto', 'true');
+        } else {
+            contenedor.style.maxHeight = "0px";
+            contenedor.style.opacity = "0";
+            localStorage.setItem('panelJuecesAbierto', 'false');
+        }
+    }
+
+    // Al cargar la página, comprueba el estado previo de forma segura
+    document.addEventListener("DOMContentLoaded", function() {
+        const estabaAbierto = localStorage.getItem('panelJuecesAbierto');
+        const checkbox = document.getElementById('toggleJueces');
+        
+        // Buscamos si existen filas reales de jueces en la tabla del HTML
+        const tieneJueces = document.querySelectorAll('tbody tr').length > 0;
+        
+        // Si el panel estaba abierto y efectivamente hay jueces cargados, lo desplegamos
+        if (estabaAbierto === 'true' && tieneJueces) {
+            checkbox.checked = true;
+            alternarSeccionJueces();
+        }
+    });
 </script>
 
 </body>

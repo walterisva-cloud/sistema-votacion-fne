@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, session
-import mysql.connector
+
 import os
-import time
-from flask import flash # Agregá esto arriba en los imports
 import csv
 import io
+import random
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+import mysql.connector
+
 #from flask import render_template, request, redirect, url_for, flash, session
 
 app = Flask(__name__)
@@ -117,9 +118,61 @@ def admin_config_colegio():
         flash("Acceso denegado.", "danger")
         return redirect(url_for('index'))
     
-    # Pasamos el nombre actual para que aparezca precargado en el input
     colegio_actual = obtener_nombre_colegio()
-    return render_template('admin_carga.html', colegio_actual=colegio_actual)
+    
+    # Traemos los jueces existentes para listarlos sin borrar nada
+    jueces_lista = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor() # Usamos el cursor común de tu app
+        
+        # Seleccionamos id, nombre y pin de la tabla jueces
+        cursor.execute("SELECT id, nombre, pin FROM jueces ORDER BY id DESC")
+        filas = cursor.fetchall()
+        
+        # Convertimos las filas a diccionarios manualmente para que el HTML los lea fácil
+        for fila in filas:
+            jueces_lista.append({
+                'id': fila[0],
+                'nombre': fila[1],
+                'pin': fila[2]
+            })
+            
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"❌ Error al traer la lista de jueces: {e}")
+
+    return render_template('admin_carga.html', colegio_actual=colegio_actual, jueces=jueces_lista)
+
+@app.route('/admin/agregar_juez', methods=['POST'])
+def admin_agregar_juez():
+    if not session.get('es_admin'):
+        flash("Acceso denegado.", "danger")
+        return redirect(url_for('index'))
+
+    nombre_juez = request.form.get('nombre_juez', '').strip()
+    if not nombre_juez:
+        flash("El nombre del juez es obligatorio.", "warning")
+        return redirect(url_for('admin_config_colegio'))
+
+    # Generamos un PIN de 4 dígitos al azar
+    pin = str(random.randint(1000, 9999))
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO jueces (nombre, pin) VALUES (%s, %s)", (nombre_juez, pin))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        flash(f"¡Juez '{nombre_juez}' agregado con éxito! PIN: {pin}", "success")
+    except Exception as e:
+        print(f"❌ Error al insertar juez: {e}")
+        flash("No se pudo registrar el juez en la base de datos.", "danger")
+
+    return redirect(url_for('admin_config_colegio'))
 
 @app.route('/admin/cargar_masiva', methods=['POST'])
 def admin_cargar_masiva():
