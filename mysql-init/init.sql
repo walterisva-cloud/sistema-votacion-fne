@@ -80,6 +80,8 @@ SET c.foto = CASE
     WHEN c.genero = 'M' THEN CONCAT('chico (', n.posicion, ').jpeg')
 END;
 
+ALTER TABLE candidatas ADD COLUMN activo TINYINT(1) DEFAULT 1;
+
 INSERT INTO jueces (nombre, pin) VALUES  
 ('Juez1', '1234'), ('Juez2', '1234'), ('Juez3', '8910'), ('Juez4', '1112'), ('Juez5', '1314'), ('Admin','1234');
 

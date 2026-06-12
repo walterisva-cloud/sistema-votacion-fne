@@ -112,38 +112,61 @@ def obtener_nombre_colegio():
         print(f"Error al obtener colegio: {e}")
     return "Secundario N° 43" # Nombre por defecto si no existe en la BD
 
+# 1. ACTUALIZAR RUTA DE CONFIGURACIÓN PARA ENVIAR CANDIDATOS A LA WEB
 @app.route('/admin/config-colegio')
 def admin_config_colegio():
     if not session.get('es_admin'):
-        flash("Acceso denegado.", "danger")
         return redirect(url_for('index'))
     
     colegio_actual = obtener_nombre_colegio()
     
-    # Traemos los jueces existentes para listarlos sin borrar nada
     jueces_lista = []
+    candidatos_lista = []
+    
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Usamos el cursor común de tu app
+        cursor = conn.cursor(dictionary=True)
         
-        # Seleccionamos id, nombre y pin de la tabla jueces
+        # Traer Jueces
         cursor.execute("SELECT id, nombre, pin FROM jueces ORDER BY id DESC")
-        filas = cursor.fetchall()
+        jueces_lista = cursor.fetchall()
         
-        # Convertimos las filas a diccionarios manualmente para que el HTML los lea fácil
-        for fila in filas:
-            jueces_lista.append({
-                'id': fila[0],
-                'nombre': fila[1],
-                'pin': fila[2]
-            })
-            
+        # Traer Candidatos (para la columna de bajas)
+        cursor.execute("SELECT id, nombre, genero, activo FROM candidatas ORDER BY genero DESC, nombre ASC")
+        candidatos_lista = cursor.fetchall()
+        
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"❌ Error al traer la lista de jueces: {e}")
+        print(f"Error al recuperar datos: {e}")
 
-    return render_template('admin_carga.html', colegio_actual=colegio_actual, jueces=jueces_lista)
+    return render_template('admin_carga.html', 
+                           colegio_actual=colegio_actual, 
+                           jueces=jueces_lista, 
+                           candidatos=candidatos_lista)
+
+# 2. NUEVA RUTA PARA CAMBIAR EL ESTADO (DAR DE BAJA / ALTA)
+@app.route('/admin/cambiar_estado_candidato/<int:candidato_id>', methods=['POST'])
+def cambiar_estado_candidato(candidato_id):
+    if not session.get('es_admin'):
+        return redirect(url_for('index'))
+        
+    estado_actual = request.form.get('estado_actual') # Tomamos el valor de la interfaz
+    nuevo_estado = 0 if estado_actual == '1' else 1
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE candidatas SET activo = %s WHERE id = %s", (nuevo_estado, candidato_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash("Estado del candidato actualizado correctamente.", "success")
+    except Exception as e:
+        print(f"Error al cambiar estado: {e}")
+        flash("No se pudo cambiar el estado.", "danger")
+        
+    return redirect(url_for('admin_gestion_vivos'))
 
 @app.route('/admin/agregar_juez', methods=['POST'])
 def admin_agregar_juez():
@@ -154,7 +177,7 @@ def admin_agregar_juez():
     nombre_juez = request.form.get('nombre_juez', '').strip()
     if not nombre_juez:
         flash("El nombre del juez es obligatorio.", "warning")
-        return redirect(url_for('admin_config_colegio'))
+        return redirect(url_for('admin_gestion_vivos'))
 
     # Generamos un PIN de 4 dígitos al azar
     pin = str(random.randint(1000, 9999))
@@ -172,7 +195,29 @@ def admin_agregar_juez():
         print(f"❌ Error al insertar juez: {e}")
         flash("No se pudo registrar el juez en la base de datos.", "danger")
 
-    return redirect(url_for('admin_config_colegio'))
+    return redirect(url_for('admin_gestion_vivos'))
+
+@app.route('/admin/eliminar_juez/<int:juez_id>', methods=['POST'])
+def eliminar_juez(juez_id):
+    if not session.get('es_admin'):
+        return redirect(url_for('index'))
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Eliminamos el juez de la tabla
+        cursor.execute("DELETE FROM jueces WHERE id = %s", (juez_id,))
+        conn.commit()
+        
+        cursor.close()
+        conn.close()
+        # flash('Juez eliminado correctamente', 'success') # Opcional si usás mensajes flash
+    except Exception as e:
+        print(f"Error al eliminar juez: {e}")
+        
+    # Redirigimos exactamente al mismo panel de gestión en vivo
+    return redirect(url_for('admin_gestion_vivos'))
 
 @app.route('/admin/cargar_masiva', methods=['POST'])
 def admin_cargar_masiva():
@@ -327,6 +372,33 @@ def index():
 def activar_correccion_sesion():
     session['modo_correccion'] = True
     return {'status': 'success'}, 200
+
+@app.route('/admin/gestion-vivos')
+def admin_gestion_vivos():
+    if not session.get('es_admin'):
+        return redirect(url_for('index'))
+    
+    jueces_lista = []
+    candidatos_lista = []
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # 1. Recuperar Jueces
+        cursor.execute("SELECT id, nombre, pin FROM jueces ORDER BY id DESC")
+        jueces_lista = cursor.fetchall()
+        
+        # 2. Recuperar Candidatos para las Bajas
+        cursor.execute("SELECT id, nombre, genero, activo FROM candidatas ORDER BY genero DESC, nombre ASC")
+        candidatos_lista = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error en panel de gestión: {e}")
+
+    return render_template('admin_gestion.html', jueces=jueces_lista, candidatos=candidatos_lista)
 
 # --- NUEVA RUTA PARA EL ADMIN ---
 @app.route('/toggle_resultados', methods=['POST'])

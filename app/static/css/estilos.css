@@ -366,3 +366,14 @@ body.votar-page {
     .categoria-box { margin-bottom: 5px; }
     .grid-puntos label { padding: 5px 0; }
 }
+
+/* Estilos aplicados a candidatos dados de baja en el index */
+.card-baja {
+    pointer-events: none; /* Bloquea interacciones por completo */
+    border: 2px dashed #e53e3e !important;
+    box-shadow: none !important;
+}
+
+.card-baja .info-candidata-overlay {
+    background: rgba(0, 0, 0, 0.75) !important; /* Oscurece un poco más el fondo */
+}

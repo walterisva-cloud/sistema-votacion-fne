@@ -39,25 +39,44 @@
     <h1>{{ colegio }}</h1>
     <h2 style="text-align: center; color: #4a148c; margin-top: -10px;">{% if genero_evento == 'M' %} Candidatos {% else %} Candidatas {% endif %}</h2>
 
-   <div class="grid-candidatas">
-        {% for c in candidatas %}
-            {% set ya_votado = (c.id in votos_realizados) and not modo_correccion %}
-            {% set existia_voto = c.id in votos_realizados %}
-            
-            <div class="card {{ 'card-votada' if ya_votado else '' }}">
-                <div class="card-media">
-                    <img src="{{ url_for('static', filename='img/' ~ c.foto) }}" class="img-candidata-index">
+    <div class="grid-candidatas">
+            {% for c in candidatas %}
+                {% set es_baja = (c.activo == 0) %}
+                {% set ya_votado = (c.id in votos_realizados) and not modo_correccion %}
+                {% set existia_voto = c.id in votos_realizados %}
+                
+                <div class="card {% if es_baja %}card-baja{% elif ya_votado %}card-votada{% endif %}">
                     
-                    <div class="info-candidata-overlay">
-                        <h2>{{ c.nombre }}</h2>
+                    {% if es_baja %}
+                        <div class="card-media" style="filter: grayscale(100%); opacity: 0.5;">
+                    {% else %}
+                        <div class="card-media">
+                    {% endif %}
+                    
+                        <img src="{{ url_for('static', filename='img/' ~ c.foto) }}" class="img-candidata-index">
+                        
+                        <div class="info-candidata-overlay">
+                            <h2>
+                                {% if es_baja %}
+                                    <del>{{ c.nombre }}</del> ⚠️
+                                {% else %}
+                                    {{ c.nombre }}
+                                {% endif %}
+                            </h2>
                         
                         <div class="contenedor-acciones-voto">
-                            {% if ya_votado %}
+                            {% if es_baja %}
+                                <p class="status-voto" style="color: #e53e3e; font-weight: bold;">🚫 DADO DE BAJA</p>
+                                <a href="#" class="btn-votar" style="pointer-events: none; opacity: 0.4; background: #c53030; cursor: not-allowed;">Inhabilitado</a>
+                            
+                            {% elif ya_votado %}
                                 <p class="status-voto">✅ Calificación Enviada</p>
                                 <a href="/votar/{{ c.id }}" class="btn-votar btn-disabled-link" style="pointer-events: none; opacity: 0.6; background: #6c757d;">Modificar Voto</a>
+                            
                             {% elif modo_correccion and existia_voto %}
                                 <p class="status-voto" style="color: #ffc107;">📝 Modificación Permitida</p>
                                 <a href="/votar/{{ c.id }}" class="btn-votar" style="background: #764ba2;">Corregir</a>
+                            
                             {% else %}
                                 <a href="/votar/{{ c.id }}" class="btn-votar">Votar</a>
                             {% endif %}
