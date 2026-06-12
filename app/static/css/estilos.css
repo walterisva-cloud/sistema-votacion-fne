@@ -295,8 +295,9 @@ body.votar-page {
 /* Contenedor en cuadrícula de 5 columnas */
 .grid-puntos {
     display: grid;
-    grid-template-columns: repeat(5, 1fr); /* 5 botones por fila */
-    gap: 8px; /* Espacio entre botones */
+    /* Ajusta automáticamente las columnas según el espacio y los elementos que entren */
+    grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); 
+    gap: 8px;
     margin-top: 10px;
 }
 

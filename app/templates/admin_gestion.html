@@ -16,6 +16,27 @@
             <p style="color: #718096; margin: 5px 0 0 0;">Administración de jurados activos y control de bajas para el establecimiento actual.</p>
         </div>
 
+        <div style="background: #fffaf0; border: 1px solid #feebc8; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+            <h3 style="color: #dd6b20; margin-top: 0; display: inline-flex; align-items: center; gap: 8px;">
+                📊 Parámetros del Sistema de Calificación
+            </h3>
+            <form action="/admin/guardar_limites_puntaje" method="POST" style="display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px;">
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="display:block; font-weight:600; color:#7b341e; margin-bottom:5px; font-size: 0.9em;">Nota Mínima permitida:</label>
+                    <input type="number" name="puntaje_min" value="{{ config.puntaje_min }}" min="1" max="20" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; box-sizing: border-box;">
+                </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="display:block; font-weight:600; color:#7b341e; margin-bottom:5px; font-size: 0.9em;">Nota Máxima permitida:</label>
+                    <input type="number" name="puntaje_max" value="{{ config.puntaje_max }}" min="1" max="20" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; box-sizing: border-box;">
+                </div>
+                <div>
+                    <button type="submit" style="background: #dd6b20; color:white; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.95em; box-shadow: 0 2px 5px rgba(221,107,32,0.2);">
+                        💾 Guardar Configuración
+                    </button>
+                </div>
+            </form>
+        </div>
+
         <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; margin-top: 30px;">
             
             <div style="border-right: 1px solid #ebdfff; padding-right: 30px;">

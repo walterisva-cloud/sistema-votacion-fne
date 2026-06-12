@@ -21,6 +21,14 @@ INSERT INTO configuracion (id, nombre_config, valor)
 VALUES (2, 'tipo_evento', '0') 
 ON DUPLICATE KEY UPDATE valor='0';
 
+INSERT INTO configuracion (id, nombre_config, valor) 
+VALUES (3, 'puntaje_min', '5') 
+ON DUPLICATE KEY UPDATE valor=valor;
+
+INSERT INTO configuracion (id, nombre_config, valor) 
+VALUES (4, 'puntaje_max', '10') 
+ON DUPLICATE KEY UPDATE valor=valor;
+
 CREATE TABLE IF NOT EXISTS candidatas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,

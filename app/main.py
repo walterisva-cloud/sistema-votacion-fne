@@ -381,25 +381,78 @@ def admin_gestion_vivos():
     jueces_lista = []
     candidatos_lista = []
     
+    # 💡 MUY IMPORTANTE: Dejalos vacíos o con None al inicializar. 
+    # Si la base de datos funciona, se tienen que llenar con lo que haya guardado.
+    config = {'puntaje_min': 5, 'puntaje_max': 10} 
+    
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        # 1. Recuperar Jueces
+        # Traer Jueces y Candidatos existentes
         cursor.execute("SELECT id, nombre, pin FROM jueces ORDER BY id DESC")
         jueces_lista = cursor.fetchall()
-        
-        # 2. Recuperar Candidatos para las Bajas
         cursor.execute("SELECT id, nombre, genero, activo FROM candidatas ORDER BY genero DESC, nombre ASC")
         candidatos_lista = cursor.fetchall()
         
+        # Traer configuraciones dinámicas
+        cursor.execute("SELECT nombre_config, valor FROM configuracion WHERE nombre_config IN ('puntaje_min', 'puntaje_max')")
+        filas_config = cursor.fetchall()
+        
+        for row in filas_config:
+            # Forzamos a quitar espacios vacíos por las dudas con .strip()
+            clave = row['nombre_config'].strip()
+            
+            if clave == 'puntaje_min':
+                config['puntaje_min'] = int(row['valor'])
+            elif clave == 'puntaje_max':
+                config['puntaje_max'] = int(row['valor'])
+                
         cursor.close()
         conn.close()
     except Exception as e:
         print(f"Error en panel de gestión: {e}")
 
-    return render_template('admin_gestion.html', jueces=jueces_lista, candidatos=candidatos_lista)
+    return render_template('admin_gestion.html', jueces=jueces_lista, candidatos=candidatos_lista, config=config)
 
+@app.route('/admin/guardar_limites_puntaje', methods=['POST'])
+def guardar_limites_puntaje():
+    if not session.get('es_admin'):
+        return redirect(url_for('index'))
+    
+    try:
+        # 1. Recuperamos los datos asegurando el nombre exacto del input HTML
+        p_min_raw = request.form.get('puntaje_min')
+        p_max_raw = request.form.get('puntaje_max')
+        
+        # 2. Imprimimos en la terminal de Docker para auditar qué viaja desde la web
+        print(f"--> [DEBUG VOTA] Recibido del formulario - Min: {p_min_raw}, Max: {p_max_raw}")
+        
+        if p_min_raw and p_max_raw:
+            # Convertimos a entero de forma segura
+            p_min = int(p_min_raw)
+            p_max = int(p_max_raw)
+            
+            # 3. Validamos que el mínimo sea estrictamente menor que el máximo
+            if p_min < p_max:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                # Modificamos usando tus registros basados en 'nombre_config'
+                cursor.execute("UPDATE configuracion SET valor = %s WHERE nombre_config = 'puntaje_min'", (str(p_min),))
+                cursor.execute("UPDATE configuracion SET valor = %s WHERE nombre_config = 'puntaje_max'", (str(p_max),))
+                
+                conn.commit()
+                print("--> [DEBUG VOTA] ¡Base de datos actualizada con éxito!")
+                cursor.close()
+                conn.close()
+            else:
+                print(f"--> [DEBUG VOTA] Validación fallida: {p_min} no es menor que {p_max}")
+                
+    except Exception as e:
+        print(f"--> [DEBUG VOTA] ERROR crítico al guardar límites: {e}")
+        
+    return redirect(url_for('admin_gestion_vivos'))
 # --- NUEVA RUTA PARA EL ADMIN ---
 @app.route('/toggle_resultados', methods=['POST'])
 def toggle_resultados():
@@ -498,10 +551,31 @@ def votar(id):
         
     cursor.close()
     conn.close()
+
+    p_min, p_max = 5, 10 # Valores por defecto por seguridad
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT nombre_config, valor FROM configuracion WHERE nombre_config IN ('puntaje_min', 'puntaje_max')")
+        
+        for row in cursor.fetchall():
+            if row['nombre_config'] == 'puntaje_min':
+                p_min = int(row['valor'])
+            elif row['nombre_config'] == 'puntaje_max':
+                p_max = int(row['valor'])
+                
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error leyendo límites en votación: {e}")
+
+    # Creamos la lista dinámica de botones válidos (ej: [5,6,7,8,9,10])
+    lista_puntajes = list(range(p_min, p_max + 1))
     
     return render_template('votar.html', 
                            candidata=candidata, 
-                           ya_voto_a_todos=ya_voto_a_todos)
+                           ya_voto_a_todos=ya_voto_a_todos,
+                           lista_puntajes=lista_puntajes)
 
 @app.route('/guardar_voto', methods=['POST'])
 def guardar_voto():
