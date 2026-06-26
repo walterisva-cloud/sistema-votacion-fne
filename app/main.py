@@ -323,38 +323,31 @@ def index():
     
     # --- PROCESAMOS NOMBRES E INYECTAMOS NUMERO_ORDEN ---
     candidatas = []
-    for i, c in enumerate(candidatas_db, start=1): # start=1 para que empiece en 1 y no en 0
+    for i, c in enumerate(candidatas_db, start=1):
         candidata_limpia = dict(c)
-        
-        # Inyectamos el campo dinámico en memoria
         candidata_limpia['numero_orden'] = i
-        
         try:
             candidata_limpia['nombre'] = c['nombre'].encode('latin1').decode('utf-8')
         except:
             pass
         candidatas.append(candidata_limpia)
-    # ---------------------------------------------------
     
-    # Obtenemos los IDs de los votos realizados por este juez
-    cursor.execute("SELECT candidata_id FROM votos WHERE juez_id = %s", (juez_id,))
+    # 🚀 CORRECCIÓN AQUÍ: Traemos los IDs únicos de candidatos votados en votos_detalle
+    cursor.execute("""
+        SELECT DISTINCT candidata_id 
+        FROM votos_detalle 
+        WHERE juez_id = %s
+    """, (juez_id,))
     votos_realizados = [v['candidata_id'] for v in cursor.fetchall()]
     
     cursor.close()
     conn.close()
     
-    # --- 💡 LÓGICA DE CONTROL EN MEMORIA (PYTHON PURO) ---
-    # 1. Obtenemos un conjunto (set) de todos los IDs de los candidatos del evento actual
+    # --- LÓGICA DE CONTROL EN MEMORIA ---
     ids_candidatas_evento = {c['id'] for c in candidatas}
-    
-    # 2. Filtramos los votos realizados por el juez que correspondan SOLAMENTE al género activo
-    # (Esto evita problemas si quedaron votos viejos guardados en la base de datos de otros eventos)
     votos_filtrados_genero = [vid for vid in votos_realizados if vid in ids_candidatas_evento]
-    
-    # 3. Comparamos si la cantidad de votos de este género es igual o mayor a la cantidad de participantes
     ya_voto_a_todos = (len(votos_filtrados_genero) >= len(ids_candidatas_evento)) and (len(ids_candidatas_evento) > 0)
 
-    # Al final de la ruta, antes del render_template, agregamos esta línea:
     modo_correccion = session.get('modo_correccion', False)
     
     return render_template('index.html', 
@@ -365,7 +358,7 @@ def index():
                            es_admin=session.get('es_admin'),
                            genero_evento=genero_actual,
                            ya_voto_a_todos=ya_voto_a_todos,
-                           modo_correccion=modo_correccion, # <-- PASAMOS ESTA NUEVA VARIABLE
+                           modo_correccion=modo_correccion,
                            colegio=obtener_nombre_colegio())
     
 @app.route('/activar_correccion_sesion', methods=['POST'])
@@ -501,25 +494,21 @@ def votar(id):
     genero_actual = obtener_tipo_evento() # Obtenemos si es 'F' o 'M'
         
     conn = get_db_connection()
-    # Usamos buffered=True para evitar desincronizaciones si hay subconsultas
     cursor = conn.cursor(dictionary=True, buffered=True)
     
-    # 1. Traemos los datos del candidato e incluimos sus votos previos si existen
+    # 1. Traemos únicamente los datos del participante (quitamos las columnas fijas del LEFT JOIN anterior)
     query = """
     SELECT 
-        c.id, c.nombre, c.foto, c.genero, sub.posicion AS numero_orden,
-        v.cat_belleza, v.cat_simpatia, v.cat_elegancia,
-        IF(v.id IS NOT NULL, 1, 0) as ya_votado
+        c.id, c.nombre, c.foto, c.genero, sub.posicion AS numero_orden
     FROM (
         SELECT id, ROW_NUMBER() OVER (PARTITION BY genero ORDER BY id) as posicion
         FROM candidatas
     ) sub
     JOIN candidatas c ON c.id = sub.id
-    LEFT JOIN votos v ON c.id = v.candidata_id AND v.juez_id = %s
     WHERE c.id = %s;
     """
     
-    cursor.execute(query, (juez_id, id))
+    cursor.execute(query, (id,))
     candidata_raw = cursor.fetchone()
     
     if not candidata_raw:
@@ -533,114 +522,147 @@ def votar(id):
     except:
         pass
 
-    # 2. Control para habilitar el botón de modificación global
-    # Contamos cuántos participantes hay en total del género activo
+    # 2. Traer las CATEGORÍAS activas de la base de datos
+    cursor.execute("SELECT id, nombre, icono FROM categorias ORDER BY id ASC")
+    categorias_raw = cursor.fetchall()
+
+    # 🚀 CONTROL ABSOLUTO DE CARACTERES: Nombres perfectos e íconos planos e indestructibles
+    lista_categorias = []
+    for row in categorias_raw:
+        cat = dict(row)
+        try:
+            cat['nombre'] = row['nombre'].encode('latin1').decode('utf-8')
+        except:
+            pass
+            
+        try:
+            if row['icono']:
+                cat['icono'] = row['icono'].encode('latin1').decode('utf-8')
+            else:
+                cat['icono'] = ""
+        except:
+            cat['icono'] = "" # Si tira error por caracteres raros, lo vaciamos por seguridad
+
+        # Mapeamos los nombres limpios con tildes para la interfaz visual
+        if cat['nombre'].lower() in ['desempenio', 'desempeño']:
+            cat['nombre'] = 'Desenvolvimiento'
+        elif cat['nombre'].lower() == 'simpatia':
+            cat['nombre'] = 'Simpatía'
+            
+        lista_categorias.append(cat)
+
+    # 3. Traer los VOTOS PREVIOS que este juez ya asignó a este participante (para Modo Corrección)
+    cursor.execute("""
+        SELECT categoria_id, puntaje 
+        FROM votos_detalle 
+        WHERE juez_id = %s AND candidata_id = %s
+    """, (juez_id, id))
+    
+    # Armamos un diccionario simple en Python para mapearlo fácil en el HTML -> { categoria_id: puntaje }
+    votos_previos = {row['categoria_id']: row['puntaje'] for row in cursor.fetchall()}
+    
+    # Agregamos una bandera simulando el 'ya_votado' si el mapa tiene registros
+    candidata['ya_votado'] = 1 if len(votos_previos) > 0 else 0
+
+    # 4. Control para habilitar el botón de modificación global (Adaptado a votos_detalle)
     cursor.execute("SELECT COUNT(1) as total FROM candidatas WHERE genero = %s", (genero_actual,))
     total_candidatas = cursor.fetchone()['total']
     
-    # Contamos cuántos votos ya cargó este juez para este género
+    # Contamos cuántos participantes únicos ya votó este juez (usando un DISTINCT)
     cursor.execute("""
-        SELECT COUNT(1) as total FROM votos v
-        JOIN candidatas c ON v.candidata_id = c.id
-        WHERE v.juez_id = %s AND c.genero = %s
+        SELECT COUNT(DISTINCT vd.candidata_id) as total 
+        FROM votos_detalle vd
+        JOIN candidatas c ON vd.candidata_id = c.id
+        WHERE vd.juez_id = %s AND c.genero = %s
     """, (juez_id, genero_actual))
     total_votos_juez = cursor.fetchone()['total']
     
-    # Si ya votó a todos, habilitamos la bandera para mostrar el botón en la plantilla
     ya_voto_a_todos = (total_votos_juez >= total_candidatas) and (total_candidatas > 0)
-        
+    
+    # 5. Recuperar límites de puntaje desde configuracion
+    p_min, p_max = 5, 10
+    cursor.execute("SELECT nombre_config, valor FROM configuracion WHERE nombre_config IN ('puntaje_min', 'puntaje_max')")
+    for row in cursor.fetchall():
+        if row['nombre_config'] == 'puntaje_min':
+            p_min = int(row['valor'])
+        elif row['nombre_config'] == 'puntaje_max':
+            p_max = int(row['valor'])
+            
     cursor.close()
     conn.close()
 
-    p_min, p_max = 5, 10 # Valores por defecto por seguridad
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT nombre_config, valor FROM configuracion WHERE nombre_config IN ('puntaje_min', 'puntaje_max')")
-        
-        for row in cursor.fetchall():
-            if row['nombre_config'] == 'puntaje_min':
-                p_min = int(row['valor'])
-            elif row['nombre_config'] == 'puntaje_max':
-                p_max = int(row['valor'])
-                
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Error leyendo límites en votación: {e}")
-
-    # Creamos la lista dinámica de botones válidos (ej: [5,6,7,8,9,10])
     lista_puntajes = list(range(p_min, p_max + 1))
     
     return render_template('votar.html', 
                            candidata=candidata, 
                            ya_voto_a_todos=ya_voto_a_todos,
-                           lista_puntajes=lista_puntajes)
+                           lista_puntajes=lista_puntajes,
+                           lista_categorias=lista_categorias,
+                           votos_previos=votos_previos)
 
 @app.route('/guardar_voto', methods=['POST'])
 def guardar_voto():
     if 'juez_id' not in session:
         return redirect(url_for('login'))
 
-    # 1. Capturamos los datos del formulario
     c_id = request.form.get('candidata_id')
-    v_belleza = request.form.get('cat_belleza')
-    v_simpatia = request.form.get('cat_simpatia')
-    v_elegancia = request.form.get('cat_elegancia')
-    
-    # 2. Verificamos que nada esté vacío
-    if not all([c_id, v_belleza, v_simpatia, v_elegancia]):
-        flash("Formulario incompleto. Por favor, selecciona todos los puntos.", "danger")
+    juez_id = session['juez_id']
+
+    if not c_id:
+        flash("Error al procesar la solicitud.", "danger")
+        return redirect(url_for('index'))
+
+    # Filtramos del request.form solo los elementos que corresponden a las calificaciones
+    votos_recibidos = {k: v for k, v in request.form.items() if k.startswith('categoria_')}
+
+    if not votos_recibidos:
+        flash("Formulario incompleto. Por favor selecciona los puntajes.", "danger")
         return redirect(url_for('index'))
 
     conn = None
     cursor = None
+    hubo_modificacion = False
+    
     try:
-        # 3. Conversión a números y cálculo del total
         c_id = int(c_id)
-        b = int(v_belleza)
-        s = int(v_simpatia)
-        e = int(v_elegancia)
-        total = b + s + e
-        
-        juez_id = session['juez_id']
-
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 4. Ajustamos el SQL con ON DUPLICATE KEY UPDATE
-        # Si la combinación (juez_id, candidata_id) ya existe, se ejecutan los UPDATE correspondientes
-        sql = """
-            INSERT INTO votos 
-            (juez_id, candidata_id, cat_belleza, cat_simpatia, cat_elegancia, total_puntos) 
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                cat_belleza = VALUES(cat_belleza),
-                cat_simpatia = VALUES(cat_simpatia),
-                cat_elegancia = VALUES(cat_elegancia),
-                total_puntos = VALUES(total_puntos);
-        """
-        
-        cursor.execute(sql, (juez_id, c_id, b, s, e, total))
+        # Recorremos cada una de las categorías enviadas por el jurado
+        for key, value in votos_recibidos.items():
+            # Extraemos el ID de la categoría del nombre del input (ej: 'categoria_4' -> 4)
+            categoria_id = int(key.split('_')[1])
+            puntaje = int(value)
+
+            sql = """
+                INSERT INTO votos_detalle (juez_id, candidata_id, categoria_id, puntaje)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    puntaje = VALUES(puntaje);
+            """
+            cursor.execute(sql, (juez_id, c_id, categoria_id, puntaje))
+            
+            # Si rowcount es 2, significa que MySQL actualizó un registro preexistente
+            if cursor.rowcount == 2:
+                hubo_modificacion = True
+
         conn.commit()
         
-        # Personalizamos el mensaje flash dependiendo de si se creó o se editó
-        if cursor.rowcount == 2:
+        if hubo_modificacion:
             flash("¡Calificación modificada con éxito!", "success")
         else:
             flash("¡Voto registrado con éxito!", "success")
 
     except mysql.connector.Error as err:
-        if conn: conn.rollback() # Limpiamos cualquier estado pendiente en la transacción
-        print(f"Error en DB: {err}")
+        if conn: conn.rollback()
+        print(f"Error procesando votación dinámica: {err}")
         flash("Error al procesar el voto en la base de datos.", "danger")
     
     finally:
-        # Cerramos correctamente en orden inverso para evitar el "Commands out of sync"
-        if cursor: 
+        if cursor:
             try: cursor.close()
             except: pass
-        if conn: 
+        if conn:
             try: conn.close()
             except: pass
 
@@ -656,32 +678,30 @@ def resultados():
     
     try:
         conn = get_db_connection()
-        # Mantenemos el buffered=True por seguridad de hilos
         cursor = conn.cursor(dictionary=True, buffered=True)
         
-        # Guardamos las variables de control al principio
         genero_actual = obtener_tipo_evento()
         es_administrador = session.get('es_admin')
 
-        # 1. Ranking con detección de empates
+        # 🚀 SOLUCIÓN DEFINITIVA: Usamos CONCAT para armar los LIKE sin romper el formato de Python
         sql_ranking = """
-            SELECT c.nombre, 
-                   IFNULL(SUM(v.cat_belleza), 0) as belleza, 
-                   IFNULL(SUM(v.cat_simpatia), 0) as simpatia, 
-                   IFNULL(SUM(v.cat_elegancia), 0) as elegancia,
-                   (IFNULL(SUM(v.cat_belleza), 0) + 
-                    IFNULL(SUM(v.cat_simpatia), 0) + 
-                    IFNULL(SUM(v.cat_elegancia), 0)) as total 
+            SELECT 
+                c.nombre as nombre, 
+                CAST(IFNULL(SUM(CASE WHEN LOWER(cat.nombre) LIKE CONCAT('%%', 'belleza', '%%') THEN vd.puntaje ELSE 0 END), 0) AS SIGNED) as belleza, 
+                CAST(IFNULL(SUM(CASE WHEN LOWER(cat.nombre) LIKE CONCAT('%%', 'simpat', '%%') THEN vd.puntaje ELSE 0 END), 0) AS SIGNED) as simpatia, 
+                CAST(IFNULL(SUM(CASE WHEN LOWER(cat.nombre) LIKE CONCAT('%%', 'elegan', '%%') THEN vd.puntaje ELSE 0 END), 0) AS SIGNED) as elegancia,
+                CAST(IFNULL(SUM(vd.puntaje), 0) AS SIGNED) as total 
             FROM candidatas c 
-            LEFT JOIN votos v ON c.id = v.candidata_id 
+            LEFT JOIN votos_detalle vd ON c.id = vd.candidata_id 
+            LEFT JOIN categorias cat ON vd.categoria_id = cat.id
             WHERE c.genero = %s
             GROUP BY c.id, c.nombre 
-            ORDER BY total DESC, elegancia DESC, belleza DESC, simpatia DESC
+            ORDER BY total DESC, nombre ASC;
         """
         cursor.execute(sql_ranking, (genero_actual,))
         ranking_raw = cursor.fetchall()
 
-        # --- CORRECCIÓN DE ACENTOS EN RANKING ---
+        # Decodificación de acentos en el ranking
         ranking = []
         for r in ranking_raw:
             candidata_r = dict(r)
@@ -691,6 +711,10 @@ def resultados():
                 pass
             ranking.append(candidata_r)
 
+        # Si la tabla está vacía, inicializamos un diccionario dummy
+        if not ranking:
+            ranking = [{'nombre': 'Sin datos', 'belleza': 0, 'simpatia': 0, 'elegancia': 0, 'total': 0}]
+
         # --- LÓGICA DE EMPATE DETALLADA ---
         hay_empate = False
         categorias_empatadas = []
@@ -699,61 +723,57 @@ def resultados():
             primer_puesto = ranking[0]
             segundo_puesto = ranking[1]
 
-            if primer_puesto['total'] == segundo_puesto['total'] and primer_puesto['total'] > 0:
-                hay_empate = True
-                if primer_puesto['belleza'] == segundo_puesto['belleza']:
-                    categorias_empatadas.append("Belleza")
-                if primer_puesto['simpatia'] == segundo_puesto['simpatia']:
-                    categorias_empatadas.append("Simpatía")
-                if primer_puesto['elegancia'] == segundo_puesto['elegancia']:
-                    categorias_empatadas.append("Elegancia")
+            if 'total' in primer_puesto and 'total' in segundo_puesto:
+                if primer_puesto['total'] == segundo_puesto['total'] and primer_puesto['total'] > 0:
+                    hay_empate = True
+                    if primer_puesto.get('belleza') == segundo_puesto.get('belleza'):
+                        categorias_empatadas.append("Belleza")
+                    if primer_puesto.get('simpatia') == segundo_puesto.get('simpatia'):
+                        categorias_empatadas.append("Simpatía")
+                    if primer_puesto.get('elegancia') == segundo_puesto.get('elegancia'):
+                        categorias_empatadas.append("Elegancia")
 
-        # Solo el admin ve la participación detallada
+        # 🚀 PARTICIPACIÓN DETALLADA: Corregida para ser compatible con DISTINCT de MySQL
         participacion = []
         if es_administrador:
-            # 💡 TRUCO DE SEGURIDAD: Vaciamos cualquier basura del cursor antes de otra consulta larga
             try: cursor.fetchall() 
             except: pass
             
             cursor.execute("""
-                SELECT j.nombre as juez, c.nombre as candidata 
-                FROM votos v 
-                JOIN jueces j ON v.juez_id = j.id 
-                JOIN candidatas c ON v.candidata_id = c.id
-                ORDER BY v.id DESC
+                SELECT DISTINCT j.nombre as juez, c.nombre as candidata 
+                FROM votos_detalle vd 
+                JOIN jueces j ON vd.juez_id = j.id 
+                JOIN candidatas c ON vd.candidata_id = c.id
+                ORDER BY juez ASC, candidata ASC;
             """)
             participacion = cursor.fetchall()
         
-        # 💡 TRUCO DE SEGURIDAD: Vaciamos nuevamente antes del monitor
         try: cursor.fetchall() 
         except: pass
 
-        # --- MONITOR DE ACTIVIDAD DE JUECES EN TIEMPO REAL ---
-        # 1. Averiguamos cuántos candidatos hay del género actual
-        cursor.execute("SELECT COUNT(1) as total FROM candidatas WHERE genero = %s", (genero_actual,))
+       # --- MONITOR DE ACTIVIDAD DE JUECES EN TIEMPO REAL ---
+        cursor.execute("SELECT COUNT(1) as total FROM candidatas WHERE genero = %s AND activo = 1", (genero_actual,))
         total_candidatas_genero = cursor.fetchone()['total']
         
-        # 💡 Limpieza rápida para el siguiente SELECT
         try: cursor.fetchall() 
         except: pass
 
-        # 2. Consultamos cuántos votos reales lleva cada juez (EXCLUYENDO AL ADMIN)
         query_monitoreo = """
             SELECT 
                 j.id as juez_id,
                 j.nombre as juez_nombre,
-                COUNT(v.id) as votos_emitidos
+                COUNT(DISTINCT vd.candidata_id) as votos_emitidos
             FROM jueces j
-            LEFT JOIN votos v ON j.id = v.juez_id 
-            LEFT JOIN candidatas c ON v.candidata_id = c.id AND c.genero = %s
+            CROSS JOIN candidatas c ON c.genero = %s AND c.activo = 1
+            LEFT JOIN votos_detalle vd ON j.id = vd.juez_id AND c.id = vd.candidata_id
             WHERE j.nombre != 'Admin'
             GROUP BY j.id, j.nombre
             ORDER BY votos_emitidos ASC, j.nombre ASC;
         """
+        # 🚀 CORRECCIÓN AQUÍ: Le agregamos (genero_actual,) para que MySQL tenga el parámetro que le falta
         cursor.execute(query_monitoreo, (genero_actual,))
         jueces_raw = cursor.fetchall()
         
-        # 3. Procesamos los datos y calculamos porcentajes en memoria
         estado_jueces = []
         todos_terminaron = True
         
@@ -778,17 +798,35 @@ def resultados():
                 
             estado_jueces.append(juez_limpio)
 
-        # 💡 Limpieza final antes del último select de config
         try: cursor.fetchall() 
         except: pass
 
-        # LEER EL ESTADO ACTUAL DE LA CONFIGURACIÓN
-        cursor.execute("SELECT valor FROM configuracion WHERE nombre_config = 'resultados_visibles'")
-        config = cursor.fetchone()
-        habilitado = (config['valor'] == '1') if config else False
-
-        # Almacenamos el estado de resultados antes de renderizar
         resultados_hab = obtener_estado_resultados()
+
+        # LISTA DE CATEGORÍAS PARA EL ABM DEL MODAL
+        lista_categorias = []
+        try:
+            conn_cat = get_db_connection()
+            cursor_cat = conn_cat.cursor(dictionary=True)
+            cursor_cat.execute("SELECT id, nombre, icono FROM categorias ORDER BY id ASC")
+            categorias_raw = cursor_cat.fetchall()
+            
+            for row in categorias_raw:
+                cat = dict(row)
+                try:
+                    cat['nombre'] = row['nombre'].encode('latin1').decode('utf-8')
+                except:
+                    pass
+                try:
+                    if row['icono']:
+                        cat['icono'] = row['icono'].encode('latin1').decode('utf-8')
+                except:
+                    pass
+                lista_categorias.append(cat)
+            cursor_cat.close()
+            conn_cat.close()
+        except Exception as e:
+            print(f"Error al traer categorías: {e}")
 
         return render_template('resultados.html', 
                                ranking=ranking,
@@ -800,15 +838,81 @@ def resultados():
                                hay_empate=hay_empate,
                                estado_jueces=estado_jueces,
                                todos_terminaron=todos_terminaron, 
+                               lista_categorias=lista_categorias,
                                colegio=obtener_nombre_colegio())
 
     except mysql.connector.Error as err:
         print(f"Error en la base de datos: {err}")
         return f"Error técnico: {err}", 500
-        
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+
+@app.route('/admin/categoria/guardar', methods=['POST'])
+def admin_categoria_guardar():
+    if not session.get('es_admin'):
+        return redirect(url_for('index'))
+    
+    cat_id = request.form.get('categoria_id')
+    nombre = request.form.get('nombre')
+    icono = request.form.get('icono', '✨')
+    
+    if not nombre:
+        flash("El nombre de la categoría es obligatorio.", "danger")
+        return redirect(url_for('resultados')) # O la ruta de tu panel principal
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if cat_id: # MODO EDICIÓN
+            cursor.execute("""
+                UPDATE categorias 
+                SET nombre = %s, icono = %s 
+                WHERE id = %s
+            """, (nombre, icono, int(cat_id)))
+            flash("¡Categoría actualizada con éxito!", "success")
+        else: # MODO ALTA
+            cursor.execute("""
+                INSERT INTO categorias (nombre, icono) 
+                VALUES (%s, %s)
+            """, (nombre, icono))
+            flash("¡Nueva categoría añadida con éxito!", "success")
+            
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error al guardar categoría: {e}")
+        flash("Error al procesar la categoría en la base de datos.", "danger")
+        
+    return redirect(url_for('resultados'))
+
+
+@app.route('/admin/categoria/eliminar/<int:id>', methods=['POST'])
+def admin_categoria_eliminar(id):
+    if not session.get('es_admin'):
+        return redirect(url_for('index'))
+        
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. Borramos en cascada los votos detallados vinculados a esta categoría
+        cursor.execute("DELETE FROM votos_detalle WHERE categoria_id = %s", (id,))
+        
+        # 2. Borramos la categoría base
+        cursor.execute("DELETE FROM categorias WHERE id = %s", (id,))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        flash("Categoría eliminada correctamente.", "success")
+    except Exception as e:
+        print(f"Error al eliminar categoría: {e}")
+        flash("Error al eliminar la categoría.", "danger")
+        
+    return redirect(url_for('resultados'))        
     
 @app.route('/logout')
 def logout():

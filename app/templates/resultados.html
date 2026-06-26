@@ -121,6 +121,9 @@
                 </h3>
                 
                 <div style="display: flex; gap: 10px; align-items: center;">
+                    <button onclick="abrirModalCategorias()" style="background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white; padding: 10px 20px; border-radius: 30px; font-weight: bold; font-size: 0.9em; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+                        🏷️ Categorías
+                    </button>
     
                     <a href="/admin/gestion-vivos" class="btn-votar" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); text-decoration: none; padding: 10px 20px; font-weight: bold; border-radius: 30px; font-size: 0.9em; box-shadow: 0 4px 10px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 6px; border: none; color: white;">
                         ⚙️ Jueces / Postulantes
@@ -298,6 +301,70 @@
         </div>
     </div>
 
+<!-- MODAL ABM DE CATEGORÍAS -->
+<div id="modalCategorias" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:2000; justify-content:center; align-items:center;">
+    <div style="background:white; padding:25px; border-radius:15px; max-width:550px; width:95%; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; text-align: left;">
+        
+        <h3 style="color:#4a148c; margin-top:0; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span>🏷️ Gestión de Categorías</span>
+            <button onclick="cerrarModalCategorias()" style="background:none; border:none; font-size:1.5em; cursor:pointer; color:#999;">&times;</button>
+        </h3>
+
+        <!-- FORMULARIO DE ALTA O EDICIÓN -->
+        <form id="formCategoria" method="POST" action="/admin/categoria/guardar" style="background:#f8f9fa; padding:15px; border-radius:10px; margin-bottom:20px;">
+            <input type="hidden" name="categoria_id" id="abm_cat_id" value="">
+            <p style="font-weight:bold; margin-top:0; color:#555; font-size:0.9em;" id="tituloFormCat">Agregar Nueva Categoría</p>
+            
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <div style="width: 70px;">
+                    <label style="display:block; font-size:0.8em; font-weight:bold; color:#666;">Ícono</label>
+                    <input type="text" name="icono" id="abm_cat_icono" placeholder="✨" value="✨" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; text-align:center; box-sizing:border-box;">
+                </div>
+                <div style="flex:1; min-width:180px;">
+                    <label style="display:block; font-size:0.8em; font-weight:bold; color:#666;">Nombre de la Categoría</label>
+                    <input type="text" name="nombre" id="abm_cat_nombre" placeholder="Ej: Desempeño" required style="width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; box-sizing:border-box;">
+                </div>
+                <div style="display:flex; align-items:flex-end; gap:5px;">
+                    <button type="submit" style="background:#4a148c; color:white; border:none; padding:9px 15px; border-radius:6px; font-weight:bold; cursor:pointer;" id="btnGuardarCat">
+                        Añadir
+                    </button>
+                    <button type="button" id="btnCancelarEdicion" onclick="resetearFormularioCat()" style="display:none; background:#e2e8f0; color:#4a5568; border:none; padding:9px 12px; border-radius:6px; font-weight:bold; cursor:pointer;">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- LISTADO DE CATEGORÍAS EXISTENTES -->
+        <p style="font-weight:bold; color:#4a148c; margin-bottom:10px;">Categorías Actuales</p>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            {% for cat in lista_categorias %}
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid #e2e8f0; border-radius:8px; background:#fff;">
+                <div style="flex:1; font-size:1.05em;">
+                    <span style="margin-right:8px;">{{ cat.icono }}</span> 
+                    <strong>{{ cat.nombre }}</strong>
+                </div>
+                <div style="display:flex; gap:6px; align-items: center;">
+                    <button onclick="editarCategoria('{{ cat.id }}', '{{ cat.nombre }}', '{{ cat.icono }}')" 
+                            style="background:#ed8936; color:white; border:none; padding:5px 10px; border-radius:4px; font-size:0.85em; cursor:pointer; font-weight:bold;">
+                        ✏️
+                    </button>
+                    <form action="/admin/categoria/eliminar/{{ cat.id }}" method="POST" style="margin:0;" onsubmit="return confirmarEliminarCat('{{ cat.nombre }}')">
+                        <button type="submit" style="background:#e53e3e; color:white; border:none; padding:5px 10px; border-radius:4px; font-size:0.85em; cursor:pointer; font-weight:bold;">
+                            🗑️
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p style="color: #888; text-align: center; font-style: italic; margin: 15px 0;">
+                No hay categorías registradas o falta sincronizar con el backend.
+            </p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
     <script>
         function toggleJueces() {
             let x = document.getElementById("detalle-jueces");
@@ -375,6 +442,41 @@
                 return confirm("⚠️ ÚLTIMA ADVERTENCIA ⚠️\n\n¿Estás seguro de que respaldaste los resultados del colegio anterior? Presiona Aceptar para formatear las tablas y cargar la nueva lista.");
             }
             return false;
+        }
+
+        function abrirModalCategorias() {
+        document.getElementById('modalCategorias').style.display = 'flex';
+        }
+
+        function cerrarModalCategorias() {
+            document.getElementById('modalCategorias').style.display = 'none';
+            resetearFormularioCat();
+        }
+
+        function editarCategoria(id, nombre, icono) {
+            // Cambiamos el formulario a Modo Edición
+            document.getElementById('abm_cat_id').value = id;
+            document.getElementById('abm_cat_nombre').value = nombre;
+            document.getElementById('abm_cat_icono').value = icono;
+            
+            document.getElementById('tituloFormCat').innerText = "✏️ Editar Categoría";
+            document.getElementById('btnGuardarCat').innerText = "Actualizar";
+            document.getElementById('btnCancelarEdicion').style.display = "inline-block";
+        }
+
+        function resetearFormularioCat() {
+            // Volvemos el formulario a su estado original (Modo Alta)
+            document.getElementById('abm_cat_id').value = "";
+            document.getElementById('abm_cat_nombre').value = "";
+            document.getElementById('abm_cat_icono').value = "✨";
+            
+            document.getElementById('tituloFormCat').innerText = "Agregar Nueva Categoría";
+            document.getElementById('btnGuardarCat').innerText = "Añadir";
+            document.getElementById('btnCancelarEdicion').style.display = "none";
+        }
+
+        function confirmarEliminarCat(nombre) {
+            return confirm(`⚠️ ¿Estás seguro de eliminar la categoría "${nombre}"?\nSe borrarán también todas las puntuaciones asociadas a ella.`);
         }
     </script>
 </body>

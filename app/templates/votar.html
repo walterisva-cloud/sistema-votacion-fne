@@ -38,40 +38,24 @@
 
             <h2>Panel de Puntuación</h2>
             
-           <div class="categorias-wrapper">     
+           <div class="categorias-wrapper"> 
+                {% for cat in lista_categorias %}
                 <div class="categoria-box">
-                    <div class="categoria-titulo">✨ Belleza</div>
+                    <div class="categoria-titulo">{{ cat.icono }} {{ cat.nombre }}</div>
                     <div class="grid-puntos">
                         {% for i in lista_puntajes %}
-                        <input type="radio" name="cat_belleza" id="bel{{ i }}" value="{{ i }}" required
-                            {% if candidata.cat_belleza == i %} checked {% endif %}>
-                        <label for="bel{{ i }}">{{ i }}</label>
+                        <input type="radio" 
+                            name="categoria_{{ cat.id }}" 
+                            id="cat_{{ cat.id }}_{{ i }}" 
+                            value="{{ i }}" 
+                            required
+                            data-nombre-cat="{{ cat.nombre }}"
+                            {% if votos_previos.get(cat.id) == i %} checked {% endif %}>
+                        <label for="cat_{{ cat.id }}_{{ i }}">{{ i }}</label>
                         {% endfor %}
                     </div>
                 </div>
-                
-                <div class="categoria-box">
-                    <div class="categoria-titulo">😊 Simpatía</div>
-                    <div class="grid-puntos">
-                        {% for i in lista_puntajes %}
-                        <input type="radio" name="cat_simpatia" id="sim{{ i }}" value="{{ i }}" required
-                            {% if candidata.cat_simpatia == i %} checked {% endif %}>
-                        <label for="sim{{ i }}">{{ i }}</label>
-                        {% endfor %}
-                    </div>
-                </div>
-                
-                <div class="categoria-box">
-                    <div class="categoria-titulo">💃 Elegancia</div>
-                    <div class="grid-puntos">
-                        {% for i in lista_puntajes %}
-                        <input type="radio" name="cat_elegancia" id="ele{{ i }}" value="{{ i }}" required
-                            {% if candidata.cat_elegancia == i %} checked {% endif %}>
-                        <label for="ele{{ i }}">{{ i }}</label>
-                        {% endfor %}
-                    </div>
-                </div>
-
+                {% endfor %}
             </div>
 
             <button type="submit" class="btn-enviar-voto" onclick="confirmarVotacion(event)">
@@ -87,12 +71,10 @@
             <p style="color:#666;">Has seleccionado los siguientes puntos para <strong>{{ candidata.nombre }}</strong>:</p>
             
             <div style="background:#f8f9fa; padding:15px; border-radius:10px; margin:20px 0; text-align:left; font-size:1.1em;">
-                <p>✨ <strong>Belleza:</strong> <span id="resumenBelleza">0</span></p>
-                <p>😊 <strong>Simpatía:</strong> <span id="resumenSimpatia">0</span></p>
-                <p>💃 <strong>Elegancia:</strong> <span id="resumenElegancia">0</span></p>
+                <div id="contenedorResumenCategorias"></div>
                 <hr>
                 <p style="text-align:center; margin-bottom:0; font-size: 1.2em;">
-                    <strong>Total: <span id="resumenTotal" style="color:#4a148c; font-size: 1.3em;">0</span> puntos</strong>
+                    <strong>Total: <span id="resumenTotal" style="color:#4a148c; font-size: 1.3em;">0</span> puntos</strong> 
                 </p>
             </div>
 
@@ -110,35 +92,46 @@
         </div>
     </div>
 
-    <script>
-        function confirmarVotacion(event) {
-            // Evitamos que el formulario se envíe directamente
-            event.preventDefault();
+   <script>
+    function confirmarVotacion(event) {
+        // 1. Evitamos que el formulario se envíe antes de que el usuario vea el resumen
+        event.preventDefault();
 
-            // Obtenemos los valores seleccionados de los radio buttons
-            const b = document.querySelector('input[name="cat_belleza"]:checked')?.value || 0;
-            const s = document.querySelector('input[name="cat_simpatia"]:checked')?.value || 0;
-            const e = document.querySelector('input[name="cat_elegancia"]:checked')?.value || 0;
-            const total = parseInt(b) + parseInt(s) + parseInt(e);
+        let total = 0;
+        
+        // 2. Buscamos todos los radio buttons o inputs numéricos seleccionados dinámicamente
+        // Esto funciona de manera automática sin importar cuántas categorías crees en el ABM
+        const inputsPuntaje = document.querySelectorAll('form#formVotacion input[type="radio"]:checked, form#formVotacion input[type="number"]');
+        
+        inputsPuntaje.forEach(input => {
+            if (input.type === 'radio' || input.type === 'number') {
+                total += parseInt(input.value) || 0;
+            }
+        });
 
-            // Inyectamos los valores en el modal
-            document.getElementById('resumenBelleza').innerText = b;
-            document.getElementById('resumenSimpatia').innerText = s;
-            document.getElementById('resumenElegancia').innerText = e;
-            document.getElementById('resumenTotal').innerText = total;
-
-            // Mostramos el modal
-            document.getElementById('modalConfirmacion').style.display = 'flex';
+        // 3. Inyectamos el total calculado en el modal para que el Juez lo valide en pantalla
+        const contenedorTotal = document.getElementById('resumenTotal');
+        if (contenedorTotal) {
+            contenedorTotal.innerText = total;
         }
 
-        function cerrarModal() {
-            document.getElementById('modalConfirmacion').style.display = 'none';
-        }
+        // 4. Mostramos el modal de confirmación
+        document.getElementById('modalConfirmacion').style.display = 'flex';
+    }
 
-        function enviarFormularioReal() {
-            // Buscamos el formulario por su ID y lo enviamos
-            document.getElementById('formVotacion').submit();
+    function cerrarModal() {
+        document.getElementById('modalConfirmacion').style.display = 'none';
+    }
+
+    function enviarFormularioReal() {
+        // 5. 🚀 LA CLAVE: Enviamos el formulario de forma directa sin código que rompa la ejecución
+        const form = document.getElementById('formVotacion');
+        if (form) {
+            form.submit();
+        } else {
+            console.error("No se encontró el formulario con ID 'formVotacion'");
         }
-    </script>
+    }
+</script>
 </body>
 </html>
