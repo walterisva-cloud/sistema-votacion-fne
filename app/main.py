@@ -250,17 +250,17 @@ def admin_cargar_masiva():
             conn = get_db_connection()
             cursor = conn.cursor()
 
-            # 🌟 GUARDAR O ACTUALIZAR EL NOMBRE DEL COLEGIO (id = 3)
+            # 🌟 CORRECCIÓN: ID 5 para mantener a salvo la configuración de puntajes
             sql_colegio = """
                 INSERT INTO configuracion (id, nombre_config, valor) 
-                VALUES (3, 'nombre_colegio', %s) 
-                ON DUPLICATE KEY UPDATE valor = VALUES(valor);
+                VALUES (5, 'nombre_colegio', %s) 
+                ON DUPLICATE KEY UPDATE valor = %s;
             """
-            cursor.execute(sql_colegio, (nombre_colegio,))
+            cursor.execute(sql_colegio, (nombre_colegio, nombre_colegio))
 
-            # Limpieza de las tablas de alumnos y votos
+            # 🌟 CORRECCIÓN: Limpieza correcta usando votos_detalle
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
-            cursor.execute("TRUNCATE TABLE votos;")
+            cursor.execute("TRUNCATE TABLE votos_detalle;")
             cursor.execute("TRUNCATE TABLE candidatas;")
 
             contador_f = 0
